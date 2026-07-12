@@ -218,7 +218,7 @@ export default function LandingPage() {
                   AI-Powered MRV Platform
                 </div>
 
-                <h1 className="font-display text-[2.75rem] sm:text-5xl lg:text-[3.5rem] font-bold tracking-tight leading-[1.08] text-foreground mb-6">
+                <h1 className="font-display text-[2.75rem] sm:text-5xl lg:text-[3.5rem] font-bold tracking-tight leading-[1.08] text-gray-900 mb-6">
                   Restore Blue Ecosystems.
                   <br />
                   <span className="text-primary">Verify Impact.</span>
@@ -226,27 +226,27 @@ export default function LandingPage() {
                   Inspire Change.
                 </h1>
 
-                <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mb-8">
+                <p className="text-lg text-gray-600 leading-relaxed max-w-xl mb-8">
                   CarbonRush AI connects Project Owners, Verification Organizations, and Sustainability Partners through a transparent Monitoring, Reporting & Verification platform for blue carbon ecosystems.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3 mb-8">
-                  <Button asChild className="bg-primary hover:bg-primary/90 text-white rounded-xl px-6 h-11 text-sm font-medium shadow-sm">
+                  <Button asChild className="bg-primary hover:bg-primary/90 text-white rounded-xl px-6 h-11 text-sm font-medium shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-lg">
                     <Link href="/dashboard/discover">
                       Explore Projects <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="rounded-xl px-6 h-11 text-sm font-medium border-primary/30 hover:bg-primary/5 text-primary">
+                  <Button asChild variant="outline" className="rounded-xl px-6 h-11 text-sm font-medium bg-white border-primary text-primary hover:bg-primary hover:text-white transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-lg">
                     <Link href="/register">
                       Request Demo
                     </Link>
                   </Button>
-                  <Button variant="ghost" className="rounded-xl px-4 h-11 text-sm font-medium text-muted-foreground hover:text-primary">
+                  <Button variant="ghost" className="rounded-xl px-4 h-11 text-sm font-medium text-gray-600 hover:text-primary transition-colors">
                     <Play className="mr-2 h-4 w-4" /> Watch Tour
                   </Button>
                 </div>
 
-                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                   {[
                     { icon: Brain, label: 'AI Powered' },
                     { icon: Map, label: 'GIS Mapping' },
@@ -254,7 +254,7 @@ export default function LandingPage() {
                     { icon: Shield, label: 'Verified MRV' },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center gap-1.5">
-                      <item.icon className="h-3.5 w-3.5 text-accent" />
+                      <item.icon className="h-3.5 w-3.5 text-primary" />
                       <span>{item.label}</span>
                     </div>
                   ))}
@@ -331,10 +331,10 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Platform</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
                 Built for every stakeholder
               </h2>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-gray-600 text-lg">
                 A unified ecosystem connecting project developers, auditors, and sustainability partners.
               </p>
             </motion.div>
@@ -361,15 +361,15 @@ export default function LandingPage() {
                 },
               ].map((role) => (
                 <motion.div key={role.title} variants={staggerItem}>
-                  <Card className="border-border bg-white hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 h-full group">
+                  <Card className="border-gray-200 bg-white group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-xl hover:bg-primary hover:border-primary h-full">
                     <CardContent className="p-7">
-                      <div className="w-12 h-12 rounded-xl bg-primary/8 flex items-center justify-center mb-5">
-                        <role.icon className="h-6 w-6 text-primary" />
+                      <div className="w-12 h-12 rounded-xl bg-primary/8 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center mb-5">
+                        <role.icon className="h-6 w-6 text-primary group-hover:text-white transition-colors duration-300" />
                       </div>
-                      <h3 className="font-display text-lg font-semibold mb-2">{role.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed mb-5">{role.desc}</p>
-                      <a href="/register" className="inline-flex items-center text-sm font-medium text-primary hover:text-primary/80 transition-colors group-hover:underline">
-                        {role.cta} <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      <h3 className="font-display text-lg font-semibold text-gray-900 group-hover:text-white transition-colors duration-300 mb-2">{role.title}</h3>
+                      <p className="text-sm text-gray-500 group-hover:text-white/85 transition-colors duration-300 leading-relaxed mb-5">{role.desc}</p>
+                      <a href="/register" className="inline-flex items-center text-sm font-medium text-primary group-hover:text-white transition-colors">
+                        {role.cta} <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                       </a>
                     </CardContent>
                   </Card>
@@ -384,10 +384,10 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">How it Works</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
                 From registration to verified impact
               </h2>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-gray-600 text-lg">
                 A seamless journey powering transparent blue carbon restoration.
               </p>
             </motion.div>
@@ -402,8 +402,8 @@ export default function LandingPage() {
                       <step.icon className="h-5 w-5 text-primary" />
                     </div>
                     <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step {i + 1}</p>
-                    <p className="text-sm font-semibold mb-1">{step.title}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{step.desc}</p>
+                    <p className="text-sm font-semibold text-gray-900 mb-1">{step.title}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{step.desc}</p>
                   </div>
                 ))}
               </div>
@@ -418,8 +418,8 @@ export default function LandingPage() {
                     <step.icon className="h-4 w-4 text-primary" />
                   </div>
                   <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step {i + 1}</p>
-                  <p className="text-sm font-semibold mb-1">{step.title}</p>
-                  <p className="text-xs text-muted-foreground">{step.desc}</p>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">{step.title}</p>
+                  <p className="text-xs text-gray-500">{step.desc}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -431,10 +431,10 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-12">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Preview</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
                 See the platform in action
               </h2>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-gray-600 text-lg">
                 Explore each dashboard and discover how CarbonRush AI works for every role.
               </p>
             </motion.div>
@@ -483,8 +483,8 @@ export default function LandingPage() {
                               <div className="w-5 h-5 rounded-md" style={{ backgroundColor: panel.color }} />
                             </div>
                             <div>
-                              <h3 className="font-display text-sm font-semibold">{panel.title}</h3>
-                              <p className="text-xs text-muted-foreground">{panel.desc}</p>
+                              <h3 className="font-display text-sm font-semibold text-gray-900">{panel.title}</h3>
+                              <p className="text-xs text-gray-500">{panel.desc}</p>
                             </div>
                           </div>
                           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -515,12 +515,12 @@ export default function LandingPage() {
             <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-16">
               {features.map((feature) => (
                 <motion.div key={feature.title} variants={staggerItem}>
-                  <div className="bg-white rounded-xl border border-border p-5 hover:shadow-md hover:shadow-primary/5 hover:border-primary/20 transition-all duration-200 h-full">
-                    <div className="w-10 h-10 rounded-lg bg-primary/6 flex items-center justify-center mb-3">
-                      <feature.icon className="h-5 w-5 text-primary" />
+                  <div className="border border-gray-200 bg-white rounded-xl p-5 group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-xl hover:bg-primary hover:border-primary h-full">
+                    <div className="w-10 h-10 rounded-lg bg-primary/6 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center mb-3">
+                      <feature.icon className="h-5 w-5 text-primary group-hover:text-white transition-colors duration-300" />
                     </div>
-                    <h3 className="font-display text-sm font-semibold mb-1">{feature.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{feature.desc}</p>
+                    <h3 className="font-display text-sm font-semibold text-gray-900 group-hover:text-white transition-colors duration-300 mb-1">{feature.title}</h3>
+                    <p className="text-xs text-gray-500 group-hover:text-white/85 transition-colors duration-300 leading-relaxed">{feature.desc}</p>
                   </div>
                 </motion.div>
               ))}
@@ -555,10 +555,10 @@ export default function LandingPage() {
 
               <motion.div {...fadeUp} className="order-1 lg:order-2">
                 <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Maps & Monitoring</Badge>
-                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
                   See restoration in real time
                 </h2>
-                <p className="text-muted-foreground text-lg leading-relaxed mb-8">
+                <p className="text-gray-600 text-lg leading-relaxed mb-8">
                   Interactive GIS maps with satellite overlays and continuous health monitoring.
                 </p>
                 <div className="space-y-4">
@@ -568,13 +568,13 @@ export default function LandingPage() {
                     { icon: Calendar, title: 'Monitoring Timeline', desc: 'Monthly evidence uploads and progress tracking.' },
                     { icon: FileText, title: 'Automated Reports', desc: 'Compliance-ready PDFs generated from monitoring data.' },
                   ].map((item) => (
-                    <div key={item.title} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <item.icon className="h-4 w-4 text-primary" />
+                    <div key={item.title} className="flex items-start gap-3 p-3 -mx-3 rounded-xl group cursor-pointer transition-all duration-300 ease-out hover:bg-primary hover:-translate-y-1 hover:shadow-md">
+                      <div className="w-8 h-8 rounded-lg bg-primary/8 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary group-hover:text-white transition-colors duration-300" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-white transition-colors duration-300">{item.title}</p>
+                        <p className="text-xs text-gray-500 group-hover:text-white/85 transition-colors duration-300">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -590,10 +590,10 @@ export default function LandingPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <motion.div {...fadeUp}>
                 <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Carbon Passport</Badge>
-                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
                   Immutable proof of impact
                 </h2>
-                <p className="text-muted-foreground text-lg leading-relaxed mb-8">
+                <p className="text-gray-600 text-lg leading-relaxed mb-8">
                   Every verified ton of carbon sequestered receives a tamper-proof digital passport — transparent, auditable, and globally recognized.
                 </p>
                 <div className="grid grid-cols-2 gap-4">
@@ -603,13 +603,13 @@ export default function LandingPage() {
                     { icon: Eye, title: 'Transparent', desc: 'Publicly verifiable on the platform' },
                     { icon: Award, title: 'Globally Trusted', desc: 'Recognized by global standards' },
                   ].map((item) => (
-                    <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl bg-background border border-border">
-                      <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
-                        <item.icon className="h-4 w-4 text-primary" />
+                    <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-gray-200 group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-xl hover:bg-primary hover:border-primary">
+                      <div className="w-9 h-9 rounded-lg bg-primary/8 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center flex-shrink-0">
+                        <item.icon className="h-4 w-4 text-primary group-hover:text-white transition-colors duration-300" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-white transition-colors duration-300">{item.title}</p>
+                        <p className="text-xs text-gray-500 group-hover:text-white/85 transition-colors duration-300">{item.desc}</p>
                       </div>
                     </div>
                   ))}
