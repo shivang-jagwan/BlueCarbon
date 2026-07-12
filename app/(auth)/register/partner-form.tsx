@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
 import { INDUSTRIES, SUSTAINABILITY_FOCUS_AREAS } from '@/lib/types';
+import { uploadFile } from '@/services/storage';
 
 const schema = z.object({
   company_name: z.string().min(2, 'Company name is required'),
@@ -83,6 +84,7 @@ export default function PartnerRegisterForm() {
   const [step, setStep] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [focusAreas, setFocusAreas] = React.useState<string[]>([]);
+  const [verificationFiles, setVerificationFiles] = React.useState<{ file: File; label: string }[]>([]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -167,7 +169,6 @@ export default function PartnerRegisterForm() {
           email: values.email,
           full_name: values.rep_full_name,
           role: 'sustainability_partner',
-          approval_status: 'approved',
           organization: values.company_name,
           industry: values.industry,
           cin: values.cin,
@@ -195,6 +196,20 @@ export default function PartnerRegisterForm() {
         email: values.email,
         password: values.password,
       });
+
+      // Upload verification documents if provided
+      if (verificationFiles.length > 0) {
+        toast.loading('Uploading verification documents...');
+        for (const item of verificationFiles) {
+          try {
+            await uploadFile(item.file, 'profile-documents', item.label.toLowerCase().replace(/ /g, '_'));
+          } catch (e) {
+            // Upload failure is non-blocking — profile is already created
+            console.error('Document upload error:', e);
+          }
+        }
+        toast.dismiss();
+      }
 
       toast.success('Account created! Welcome to CarbonRush AI.');
       router.push('/dashboard');
@@ -297,7 +312,7 @@ export default function PartnerRegisterForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Industry</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger></FormControl>
                           <SelectContent>
                             {INDUSTRIES.map((ind) => (
@@ -530,7 +545,7 @@ export default function PartnerRegisterForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Country</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="India">India</SelectItem>
@@ -602,22 +617,45 @@ export default function PartnerRegisterForm() {
                   </p>
                 </div>
                 {[
-                  { label: 'Company Registration', hint: 'PDF up to 10MB' },
-                  { label: 'PAN Card', hint: 'PDF, JPG up to 5MB' },
-                  { label: 'GST Certificate', hint: 'PDF up to 5MB' },
-                  { label: 'CSR Registration (Optional)', hint: 'PDF up to 5MB' },
-                ].map((doc) => (
+                  { label: 'Company Registration', hint: 'PDF up to 10MB', accept: '.pdf' },
+                  { label: 'PAN Card', hint: 'PDF, JPG up to 5MB', accept: '.pdf,.jpg,.jpeg,.png' },
+                  { label: 'GST Certificate', hint: 'PDF up to 5MB', accept: '.pdf' },
+                  { label: 'CSR Registration (Optional)', hint: 'PDF up to 5MB', accept: '.pdf' },
+                ].map((doc) => {
+                  const existingFile = verificationFiles.find(f => f.label === doc.label);
+                  return (
                   <div key={doc.label}>
                     <Label>{doc.label}</Label>
-                    <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-5 text-center transition-colors hover:border-primary/40">
+                    <input
+                      type="file"
+                      id={`upload-${doc.label}`}
+                      className="hidden"
+                      accept={doc.accept}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const newFiles = verificationFiles.filter(f => f.label !== doc.label);
+                          newFiles.push({ file: e.target.files[0], label: doc.label });
+                          setVerificationFiles(newFiles);
+                        }
+                      }}
+                    />
+                    <div 
+                      onClick={() => document.getElementById(`upload-${doc.label}`)?.click()}
+                      className={cn(
+                        "mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-5 text-center transition-colors",
+                        existingFile ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                      )}
+                    >
                       <div>
-                        <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
-                        <p className="mt-1.5 text-xs text-muted-foreground">Click to upload</p>
-                        <p className="text-[10px] text-muted-foreground/70">{doc.hint}</p>
+                        <Upload className={cn("mx-auto h-6 w-6", existingFile ? "text-primary" : "text-muted-foreground")} />
+                        <p className="mt-1.5 text-xs font-medium">
+                          {existingFile ? existingFile.file.name : 'Click to upload'}
+                        </p>
+                        {!existingFile && <p className="text-[10px] text-muted-foreground/70">{doc.hint}</p>}
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
 

@@ -86,14 +86,17 @@ export async function middleware(request: NextRequest) {
   // Role from JWT metadata — still no DB call
   const role = user.user_metadata?.role as string | undefined;
 
-  // Block wrong panel access
-  if (pathname.startsWith('/dashboard') && role !== 'project_owner') {
+  // Block wrong panel access (only if role is known — unknown roles fall through to layout DB check)
+  if (pathname.startsWith('/admin') && role && role !== 'admin') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
-  if ((pathname.startsWith('/verifier') || pathname.startsWith('/projects')) && role !== 'verifier') {
+  if (pathname.startsWith('/dashboard') && role && !['project_owner', 'verifier', 'sustainability_partner', 'admin'].includes(role)) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+  if ((pathname.startsWith('/verifier') || pathname.startsWith('/projects')) && role && role !== 'verifier') {
     return NextResponse.redirect(new URL('/verifier/login', request.url));
   }
-  if (pathname.startsWith('/sustainability/dashboard') && role !== 'sustainability_partner') {
+  if (pathname.startsWith('/sustainability/dashboard') && role && role !== 'sustainability_partner') {
     return NextResponse.redirect(new URL('/sustainability/login', request.url));
   }
 

@@ -68,7 +68,7 @@ export default function ReportsPage() {
         <h2 className="mb-4 font-display text-lg font-semibold">Project Summary</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryItem icon={BarChart3} label="Monitoring Reports" value={String(reports.length)} />
-          <SummaryItem icon={DollarSign} label="Total Funding" value={`$${totalFunding.toLocaleString()}`} />
+          <SummaryItem icon={DollarSign} label="Total Support" value={`$${totalFunding.toLocaleString()}`} />
           <SummaryItem icon={Leaf} label="Area" value={project?.area_hectares ? `${project.area_hectares.toFixed(1)} ha` : '—'} />
           <SummaryItem icon={TrendingUp} label="Health Score" value={project?.health_score ? `${project.health_score}/100` : '—'} />
         </div>

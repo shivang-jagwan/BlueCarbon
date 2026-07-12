@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { FileUpload } from '@/components/shared/FileUpload';
 import {
   User, MapPin, Landmark, Briefcase, ShieldCheck, Save, Loader2, Building2, Leaf,
 } from 'lucide-react';
@@ -220,6 +221,32 @@ export default function ProfilePage() {
             <div><Label>Account Number</Label><Input value={form.account_number} onChange={(e) => setForm({ ...form, account_number: e.target.value })} className="mt-1.5" /></div>
             <div><Label>IFSC Code</Label><Input value={form.ifsc_code} onChange={(e) => setForm({ ...form, ifsc_code: e.target.value })} className="mt-1.5" /></div>
             <div><Label>UPI ID</Label><Input value={form.upi_id} onChange={(e) => setForm({ ...form, upi_id: e.target.value })} className="mt-1.5" /></div>
+          </div>
+        </Card>
+      )}
+
+      {/* KYC Documents */}
+      {profile.kyc_status !== 'verified' && (
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2"><ShieldCheck className="h-4.5 w-4.5 text-primary" /><h2 className="font-semibold">KYC Documents</h2></div>
+          <p className="mb-4 text-sm text-muted-foreground">Upload your identity verification documents to get your profile approved.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FileUpload
+              bucket="profile-documents"
+              category="aadhaar"
+              label="Upload Aadhaar / ID"
+              onUploadSuccess={() => {
+                toast.success('Document uploaded');
+              }}
+            />
+            <FileUpload
+              bucket="profile-documents"
+              category="passport_photo"
+              label="Upload Passport Photo"
+              onUploadSuccess={() => {
+                toast.success('Document uploaded');
+              }}
+            />
           </div>
         </Card>
       )}

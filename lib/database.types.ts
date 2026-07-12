@@ -21,7 +21,6 @@ export interface Database {
           verified_carbon_tonnes: number | null;
           start_date: string | null;
           end_date: string | null;
-          verifier_id: string | null;
           verification_status: string;
           passport_issued_at: string | null;
           objectives: string | null;
@@ -37,8 +36,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: any;
-        Update: any;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
       };
       profiles: {
         Row: {
@@ -50,8 +49,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: any;
-        Update: any;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
       };
       project_activity: {
         Row: {
@@ -64,10 +63,10 @@ export interface Database {
           metadata: Json | null;
           created_at: string;
         };
-        Insert: any;
-        Update: any;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
       };
-      funding_contributions: {
+      project_support: {
         Row: {
           id: string;
           project_id: string;
@@ -77,10 +76,10 @@ export interface Database {
           status: string;
           created_at: string;
         };
-        Insert: any;
-        Update: any;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
       };
-      verification_requests: {
+      verification_service_requests: {
         Row: {
           id: string;
           project_id: string;
@@ -94,8 +93,51 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: any;
-        Update: any;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+      };
+      verification_service_decisions: {
+        Row: {
+          id: string;
+          request_id: string;
+          verifier_id: string;
+          decision: string;
+          remarks: string | null;
+          justification: string | null;
+          file_path: string | null;
+          created_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+      };
+      carbon_passports: {
+        Row: {
+          id: string;
+          project_id: string;
+          issued_by: string;
+          status: string;
+          certificate_url: string | null;
+          created_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+      };
+      project_partnerships: {
+        Row: {
+          id: string;
+          project_id: string;
+          company_id: string;
+          verifier_id: string;
+          status: 'pending_owner' | 'pending_verifier' | 'active' | 'rejected' | 'terminated';
+          service_type: string;
+          start_date: string | null;
+          budget_usd: number | null;
+          message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
       };
     };
     Views: {};

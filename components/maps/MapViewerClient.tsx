@@ -1,26 +1,26 @@
 import * as React from 'react';
-import Map, { NavigationControl, FullscreenControl, ScaleControl, GeolocateControl, MapRef } from 'react-map-gl/maplibre';
+import Map, { NavigationControl, FullscreenControl, ScaleControl, GeolocateControl, MapRef, ViewState, MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { LayerSwitcher, MapStyle } from './LayerSwitcher';
 
 interface MapViewerProps {
   children?: React.ReactNode;
-  initialViewState?: any;
+  initialViewState?: Partial<ViewState>;
   mapStyle?: MapStyle;
   interactive?: boolean;
   cursor?: string;
   mapRef?: React.Ref<MapRef>;
   onLoad?: (e: any) => void;
-  onClick?: (e: any) => void;
-  onMouseMove?: (e: any) => void;
+  onClick?: (e: MapLayerMouseEvent) => void;
+  onMouseMove?: (e: MapLayerMouseEvent) => void;
 }
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
 export function MapViewer({
   children,
-  initialViewState = { longitude: 79, latitude: 22, zoom: 4 },
-  mapStyle = 'satellite',
+  initialViewState = { longitude: 81.31015, latitude: 21.68045, zoom: 10.9 },
+  mapStyle = 'hybrid',
   interactive = true,
   cursor,
   mapRef,
@@ -42,9 +42,9 @@ export function MapViewer({
     switch(s) {
       case 'satellite': return `https://api.maptiler.com/maps/satellite/style.json?key=${MAPTILER_KEY}`;
       case 'street': return `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
-      case 'hybrid': return `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`;
+      case 'hybrid': return `https://api.maptiler.com/maps/hybrid-v4/style.json?key=${MAPTILER_KEY}`;
       case 'terrain': return `https://api.maptiler.com/maps/outdoor-v2/style.json?key=${MAPTILER_KEY}`;
-      default: return `https://api.maptiler.com/maps/satellite/style.json?key=${MAPTILER_KEY}`;
+      default: return `https://api.maptiler.com/maps/hybrid-v4/style.json?key=${MAPTILER_KEY}`;
     }
   };
 

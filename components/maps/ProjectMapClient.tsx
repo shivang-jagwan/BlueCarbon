@@ -18,16 +18,18 @@ interface ProjectMapProps {
 export function ProjectMap({ geojson, areaHa, perimeterKm, bbox, center, height = '500px' }: ProjectMapProps) {
   const mapRef = React.useRef<MapRef>(null);
 
-  const calculatedArea = areaHa ?? (geojson && geojson.features.length > 0 ? turf.area(geojson as any)/10000 : 0);
-  const calculatedPerim = perimeterKm ?? (geojson && geojson.features.length > 0 ? turf.length(geojson as any, { units: 'kilometers' }) : 0);
+  const calculatedArea = areaHa ?? (geojson && geojson.features.length > 0 ? turf.area(geojson as turf.AllGeoJSON)/10000 : 0);
+  const calculatedPerim = perimeterKm ?? (geojson && geojson.features.length > 0 ? turf.length(geojson as GeoJSON.FeatureCollection, { units: 'kilometers' }) : 0);
 
   const computedCenter = React.useMemo(() => {
     if (center) return center;
     if (geojson && geojson.features.length > 0) {
       try {
-        const pt = turf.center(geojson as any);
+        const pt = turf.center(geojson as turf.AllGeoJSON);
         return { lat: pt.geometry.coordinates[1], lng: pt.geometry.coordinates[0] };
-      } catch (e) {}
+      } catch {
+        return null;
+      }
     }
     return null;
   }, [geojson, center]);
@@ -36,8 +38,10 @@ export function ProjectMap({ geojson, areaHa, perimeterKm, bbox, center, height 
     if (bbox && bbox.length === 4) return bbox as [number, number, number, number];
     if (geojson && geojson.features.length > 0) {
       try {
-        return turf.bbox(geojson as any) as [number, number, number, number];
-      } catch (e) {}
+        return turf.bbox(geojson as turf.AllGeoJSON) as [number, number, number, number];
+      } catch {
+        return null;
+      }
     }
     return null;
   }, [geojson, bbox]);
@@ -57,7 +61,7 @@ export function ProjectMap({ geojson, areaHa, perimeterKm, bbox, center, height 
         interactive={true} 
       >
         {geojson && (
-          <Source type="geojson" data={geojson as any}>
+          <Source type="geojson" data={geojson as GeoJSON.FeatureCollection}>
             <Layer 
               id="project-fill" 
               type="fill" 

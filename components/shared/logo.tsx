@@ -17,14 +17,14 @@ export function Logo({
     <div className={cn('flex items-center gap-2.5', className)}>
       <div
         className={cn(
-          'relative flex h-9 w-9 items-center justify-center rounded-xl gradient-ocean shadow-soft',
+          'relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-soft',
           iconClassName
         )}
       >
         <svg
           viewBox="0 0 24 24"
           fill="none"
-          className="h-5 w-5 text-white"
+          className="h-5 w-5 text-primary-foreground"
           aria-hidden="true"
         >
           <path

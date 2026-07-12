@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils';
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
-    pledged: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    active: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     completed: 'bg-success/10 text-success',
-    refunded: 'bg-destructive/10 text-destructive',
+    terminated: 'bg-destructive/10 text-destructive',
   };
   return map[status] || 'bg-muted text-muted-foreground';
 }
@@ -31,14 +32,14 @@ export default function FundingPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-xl font-semibold">Funding</h1>
+          <h1 className="font-display text-xl font-semibold">Support</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage funding requests and track partner contributions
+            Manage support requests and track partner contributions
           </p>
         </div>
         <Button>
           <HandHeart className="mr-2 h-4 w-4" />
-          Request Funding
+          Request Support
         </Button>
       </div>
 
@@ -61,9 +62,9 @@ export default function FundingPage() {
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Pledged</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
               <p className="font-display text-xl font-semibold">
-                ${contributions.filter((c) => c.status === 'pledged').reduce((s, c) => s + c.amount_usd, 0).toLocaleString()}
+                ${contributions.filter((c) => c.status === 'pending').reduce((s, c) => s + c.amount_usd, 0).toLocaleString()}
               </p>
             </div>
           </div>
@@ -85,7 +86,7 @@ export default function FundingPage() {
 
       {/* Contributions */}
       <Card className="p-5">
-        <h2 className="mb-4 font-semibold">Funding Contributions</h2>
+        <h2 className="mb-4 font-semibold">Support Contributions</h2>
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Clock className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -94,9 +95,9 @@ export default function FundingPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
             <HandHeart className="h-10 w-10 text-muted-foreground/40" />
             <div>
-              <p className="font-medium">No funding yet</p>
+              <p className="font-medium">No support yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Create a funding request to attract sustainability partners
+                Create a support request to attract sustainability partners
               </p>
             </div>
           </div>

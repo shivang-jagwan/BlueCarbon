@@ -4,3 +4,19 @@ publish = ".next"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
+
+[[headers]]
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+X-XSS-Protection = "1; mode=block"
+Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"
+Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+[[redirects]]
+from = "https://*.netlify.app/*"
+to = "https://carbonrush.ai/:splat"
+status = 301
+conditions = {Type = ["text/html"]}

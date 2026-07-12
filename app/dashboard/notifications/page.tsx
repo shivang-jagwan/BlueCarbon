@@ -72,7 +72,7 @@ export default function NotificationsPage() {
           <div>
             <h3 className="font-semibold">No notifications</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              You will be notified about verification updates, funding, and more
+              You will be notified about verification updates, support commitments, and more
             </p>
           </div>
         </Card>

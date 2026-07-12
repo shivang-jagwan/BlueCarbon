@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: carbonrush-marketplace
+    runtime: image
+    image:
+      url: # Uses Dockerfile from repo root
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_MAPTILER_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SHOW_DEMO
+        value: "true"

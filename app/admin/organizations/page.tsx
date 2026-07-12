@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -14,174 +13,109 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, ExternalLink, Shield, Ban, Trash2, Star, Users, Briefcase } from 'lucide-react';
-
-const MOCK_ORGS = [
-  {
-    id: 'ORG-001',
-    name: 'EcoTrust Auditors',
-    type: 'verifier',
-    subType: 'Third-Party Verification Agency',
-    rating: 4.8,
-    projects: 42,
-    members: 15,
-    status: 'approved',
-  },
-  {
-    id: 'ORG-002',
-    name: 'Green Earth NGO',
-    type: 'verifier',
-    subType: 'Environmental NGO',
-    rating: 4.5,
-    projects: 18,
-    members: 8,
-    status: 'approved',
-  },
-  {
-    id: 'ORG-003',
-    name: 'Oceanic IO',
-    type: 'partner',
-    subType: 'Technology',
-    rating: 4.9,
-    projects: 5,
-    members: 3,
-    status: 'approved',
-  },
-  {
-    id: 'ORG-004',
-    name: 'TechFlow Corp',
-    type: 'partner',
-    subType: 'Technology',
-    rating: 4.2,
-    projects: 2,
-    members: 2,
-    status: 'pending',
-  },
-  {
-    id: 'ORG-005',
-    name: 'AuditCorp',
-    type: 'verifier',
-    subType: 'Certified Carbon Auditor',
-    rating: 4.1,
-    projects: 88,
-    members: 35,
-    status: 'suspended',
-  },
-];
+import { Search, Star, Clock, Building2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase/client';
+import type { Profile } from '@/lib/types';
 
 export default function OrganizationManagementPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [profiles, setProfiles] = React.useState<Profile[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const renderTable = (orgType: string) => {
-    const filtered = MOCK_ORGS.filter(o => 
-      o.type === orgType &&
-      o.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  React.useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('role', ['verifier', 'sustainability_partner'])
+        .order('created_at', { ascending: false });
+      setProfiles((data as Profile[]) || []);
+      setLoading(false);
+    })();
+  }, []);
 
-    return (
-      <Table>
-        <TableHeader>
+  const filtered = profiles.filter((p) =>
+    (p.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.organization || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const verifiers = filtered.filter((p) => p.role === 'verifier');
+  const partners = filtered.filter((p) => p.role === 'sustainability_partner');
+
+  const renderTable = (orgs: Profile[]) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Organization</TableHead>
+          <TableHead>Email</TableHead>
+          <TableHead>Rating</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Joined</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {loading ? (
           <TableRow>
-            <TableHead>Organization</TableHead>
-            <TableHead>Type / Industry</TableHead>
-            <TableHead>Rating</TableHead>
-            <TableHead>Projects</TableHead>
-            <TableHead>Members</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableCell colSpan={5} className="h-24 text-center">
+              <Clock className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+            </TableCell>
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filtered.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center">
-                No organizations found.
+        ) : orgs.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={5} className="h-32 text-center">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <Building2 className="h-8 w-8 opacity-40" />
+                <p className="text-sm font-medium">No organizations found</p>
+                <p className="text-xs">Organizations will appear here once verifiers and partners register</p>
+              </div>
+            </TableCell>
+          </TableRow>
+        ) : (
+          orgs.map((org) => (
+            <TableRow key={org.id}>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-medium text-sm">{org.full_name || org.organization || 'Unnamed'}</span>
+                  <span className="text-xs text-muted-foreground">{org.organization || '—'}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <span className="text-sm text-muted-foreground">{org.email}</span>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                  <span className="text-sm font-medium">{org.rating ? org.rating.toFixed(1) : '—'}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant="secondary"
+                  className={
+                    org.approval_status === 'approved' ? 'bg-success/10 text-success' :
+                    org.approval_status === 'pending' ? 'bg-warning/10 text-warning' :
+                    'bg-destructive/10 text-destructive'
+                  }
+                >
+                  {org.approval_status.charAt(0).toUpperCase() + org.approval_status.slice(1)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <span className="text-sm text-muted-foreground">{new Date(org.created_at).toLocaleDateString()}</span>
               </TableCell>
             </TableRow>
-          ) : (
-            filtered.map((org) => (
-              <TableRow key={org.id}>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-sm">{org.name}</span>
-                    <span className="text-xs text-muted-foreground">{org.id}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm">{org.subType}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-                    <span className="text-sm font-medium">{org.rating.toFixed(1)}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{org.projects}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{org.members}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge 
-                    variant="secondary" 
-                    className={
-                      org.status === 'approved' ? 'bg-success/10 text-success' : 
-                      org.status === 'pending' ? 'bg-warning/10 text-warning' : 
-                      'bg-destructive/10 text-destructive'
-                    }
-                  >
-                    {org.status.charAt(0).toUpperCase() + org.status.slice(1)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[160px]">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem><ExternalLink className="mr-2 h-4 w-4" /> View Profile</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {org.status === 'suspended' ? (
-                        <DropdownMenuItem className="text-success"><Shield className="mr-2 h-4 w-4" /> Activate</DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem className="text-warning"><Ban className="mr-2 h-4 w-4" /> Suspend</DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    );
-  };
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold tracking-tight">Organizations</h1>
-        <p className="text-sm text-muted-foreground">Manage NGOs, Verifiers, and Sustainability Partners</p>
+        <p className="text-sm text-muted-foreground">Manage Verifiers and Sustainability Partners</p>
       </div>
 
       <div className="flex max-w-sm relative">
@@ -196,14 +130,14 @@ export default function OrganizationManagementPage() {
 
       <Tabs defaultValue="verifier" className="w-full">
         <TabsList className="mb-4 bg-muted/50 p-1">
-          <TabsTrigger value="verifier" className="rounded-sm">Verification Agencies & NGOs</TabsTrigger>
-          <TabsTrigger value="partner" className="rounded-sm">Sustainability Partners</TabsTrigger>
+          <TabsTrigger value="verifier" className="rounded-sm">Verifiers ({verifiers.length})</TabsTrigger>
+          <TabsTrigger value="partner" className="rounded-sm">Sustainability Partners ({partners.length})</TabsTrigger>
         </TabsList>
-        
+
         <Card>
           <CardContent className="p-0">
-            <TabsContent value="verifier" className="m-0 border-none">{renderTable('verifier')}</TabsContent>
-            <TabsContent value="partner" className="m-0 border-none">{renderTable('partner')}</TabsContent>
+            <TabsContent value="verifier" className="m-0 border-none">{renderTable(verifiers)}</TabsContent>
+            <TabsContent value="partner" className="m-0 border-none">{renderTable(partners)}</TabsContent>
           </CardContent>
         </Card>
       </Tabs>

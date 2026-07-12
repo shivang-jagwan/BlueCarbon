@@ -6,7 +6,7 @@ export async function getOwnerProjects(ownerId: string) {
   const supabase = await getSupabaseServerClient();
   return supabase
     .from('projects')
-    .select('id, name, ecosystem_type, status, state, district, area_hectares, total_carbon_certified, current_cycle, total_cycles, updated_at')
+    .select('id, name, project_type, status, location_name, country, area_hectares, verified_carbon_tonnes, updated_at')
     .eq('owner_id', ownerId)
     .order('updated_at', { ascending: false });
 }

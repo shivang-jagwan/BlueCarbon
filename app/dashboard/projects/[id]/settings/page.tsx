@@ -170,7 +170,7 @@ export default function ProjectSettingsPage() {
           {[
             'Verification status updates',
             'New evidence comments',
-            'Funding received',
+            'Support received',
             'Monthly monitoring reminders',
             'NGO messages',
           ].map((item) => (

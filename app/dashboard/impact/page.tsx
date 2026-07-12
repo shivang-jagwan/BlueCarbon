@@ -5,13 +5,11 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   Ruler, Leaf, Users, Sprout, Building2, FolderKanban,
   TrendingUp, MapPin, BarChart3, Globe,
 } from 'lucide-react';
-import { PROJECT_TYPE_LABELS, type Project, type ProjectType, type FundingContribution } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { PROJECT_TYPE_LABELS, type Project, type ProjectType, type ProjectSupport } from '@/lib/types';
 
 export default function ImpactDashboardPage() {
   const { user } = useAuth();
@@ -23,10 +21,10 @@ export default function ImpactDashboardPage() {
     (async () => {
       setLoading(true);
       const { data: contribs } = await supabase
-        .from('funding_contributions')
+        .from('project_support')
         .select('project_id')
         .eq('partner_id', user.id);
-      const projectIds = Array.from(new Set((contribs || []).map((c: FundingContribution) => c.project_id)));
+      const projectIds = Array.from(new Set((contribs || []).map((c: ProjectSupport) => c.project_id)));
       if (projectIds.length > 0) {
         const { data: projData } = await supabase
           .from('projects')
@@ -41,7 +39,6 @@ export default function ImpactDashboardPage() {
   const totalArea = projects.reduce((s, p) => s + (p.area_hectares || 0), 0);
   const totalCarbon = projects.reduce((s, p) => s + (p.target_carbon_tonnes || 0), 0);
   const activeProjects = projects.filter((p) => p.status === 'active' || p.status === 'verified').length;
-  const ngosPartnered = new Set(projects.map((p) => p.verifier_id).filter(Boolean)).size;
 
   const typeBreakdown = projects.reduce((acc, p) => {
     acc[p.project_type] = (acc[p.project_type] || 0) + 1;
@@ -55,7 +52,7 @@ export default function ImpactDashboardPage() {
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Impact Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Executive overview of your sustainability investments and environmental impact
+          Executive overview of your sustainability support and environmental impact
         </p>
       </div>
 
@@ -64,7 +61,6 @@ export default function ImpactDashboardPage() {
         <KpiCard label="Total Area Restored" value={`${totalArea.toFixed(1)} ha`} icon={Ruler} />
         <KpiCard label="Est. CO₂ Sequestered" value={`${totalCarbon} t`} icon={Leaf} />
         <KpiCard label="Active Projects" value={activeProjects} icon={FolderKanban} />
-        <KpiCard label="Active NGOs" value={ngosPartnered} icon={Building2} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard label="Communities Supported" value="—" hint="Coming soon" icon={Users} />

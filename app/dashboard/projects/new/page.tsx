@@ -23,7 +23,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import { Card } from '@/components/ui/card';
+import { uploadFile } from '@/services/storage';
 import {
   Select,
   SelectContent,
@@ -83,6 +85,11 @@ export default function NewProjectPage() {
   const [perimeter, setPerimeter] = React.useState(0);
   const [center, setCenter] = React.useState<{ lat: number; lng: number } | null>(null);
   const [bbox, setBbox] = React.useState<number[] | null>(null);
+  
+  // File states
+  const [baselineFiles, setBaselineFiles] = React.useState<{ file: File; label: string }[]>([]);
+  const [landRegistryFile, setLandRegistryFile] = React.useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = React.useState(0);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -143,6 +150,7 @@ export default function NewProjectPage() {
       return;
     }
     setLoading(true);
+    setUploadProgress(0);
     try {
       const slug = slugify(values.name);
       
@@ -169,10 +177,35 @@ export default function NewProjectPage() {
       };
 
       const projectData = await createProject(insertData);
+      
+      // Handle file uploads after project is created
+      const allFiles = [...baselineFiles];
+      if (landRegistryFile) {
+        allFiles.push({ file: landRegistryFile, label: 'land_registry' });
+      }
+
+      if (allFiles.length > 0) {
+        toast.loading('Uploading project files...');
+        for (let i = 0; i < allFiles.length; i++) {
+          const item = allFiles[i];
+          try {
+            const bucket = item.label === 'land_registry' ? 'project-documents' : 'evidence';
+            const category = item.label === 'land_registry' ? 'land_registry' : 'baseline';
+            await uploadFile(item.file, bucket, category, projectData.id);
+            setUploadProgress(Math.round(((i + 1) / allFiles.length) * 100));
+          } catch (e) {
+            // Upload failure is non-blocking — project is already created
+            console.error('File upload error:', e);
+            toast.error(`Failed to upload ${item.label}. You can re-upload from the project page.`);
+          }
+        }
+        toast.dismiss();
+      }
 
       toast.success('Project registered successfully!');
       router.push(`/dashboard/projects/${projectData.id}`);
     } catch (err) {
+      toast.dismiss();
       const message = err instanceof Error ? err.message : 'Failed to create project';
       toast.error(message);
     } finally {
@@ -267,7 +300,7 @@ export default function NewProjectPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Project Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select type" />
@@ -349,7 +382,7 @@ export default function NewProjectPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Country</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select country" />
@@ -387,7 +420,7 @@ export default function NewProjectPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Ownership Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select ownership type" />
@@ -419,13 +452,30 @@ export default function NewProjectPage() {
                 />
                 <div>
                   <Label>Land Registry Document</Label>
-                  <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40">
+                  <input
+                    type="file"
+                    id="land-registry-upload"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setLandRegistryFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <div 
+                    onClick={() => document.getElementById('land-registry-upload')?.click()}
+                    className={cn(
+                      "mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40",
+                      landRegistryFile && "border-primary bg-primary/5"
+                    )}
+                  >
                     <div>
-                      <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Click to upload or drag and drop
+                      <Upload className={cn("mx-auto h-8 w-8", landRegistryFile ? "text-primary" : "text-muted-foreground")} />
+                      <p className="mt-2 text-sm font-medium">
+                        {landRegistryFile ? landRegistryFile.name : 'Click to upload'}
                       </p>
-                      <p className="text-[10px] text-muted-foreground/70">PDF, JPG, PNG up to 10MB</p>
+                      {!landRegistryFile && <p className="text-[10px] text-muted-foreground/70">PDF, JPG, PNG up to 10MB</p>}
                     </div>
                   </div>
                 </div>
@@ -443,24 +493,48 @@ export default function NewProjectPage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {[
-                    { label: 'Ground Images', hint: 'JPG, PNG up to 10MB' },
-                    { label: 'Drone Images', hint: 'JPG, PNG, TIFF up to 50MB' },
-                    { label: 'Videos', hint: 'MP4, MOV up to 100MB' },
-                    { label: 'Initial Survey', hint: 'PDF up to 20MB' },
-                    { label: 'Water Report', hint: 'PDF up to 10MB' },
-                    { label: 'Soil Report', hint: 'PDF up to 10MB' },
-                  ].map((item) => (
+                    { label: 'Ground Images', hint: 'JPG, PNG up to 10MB', accept: 'image/*' },
+                    { label: 'Drone Images', hint: 'JPG, PNG, TIFF up to 50MB', accept: 'image/*' },
+                    { label: 'Videos', hint: 'MP4, MOV up to 100MB', accept: 'video/*' },
+                    { label: 'Initial Survey', hint: 'PDF up to 20MB', accept: '.pdf' },
+                    { label: 'Water Report', hint: 'PDF up to 10MB', accept: '.pdf' },
+                    { label: 'Soil Report', hint: 'PDF up to 10MB', accept: '.pdf' },
+                  ].map((item) => {
+                    const existingFile = baselineFiles.find(f => f.label === item.label);
+                    
+                    return (
                     <div key={item.label}>
                       <Label>{item.label}</Label>
-                      <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-5 text-center transition-colors hover:border-primary/40">
+                      <input
+                        type="file"
+                        id={`upload-${item.label}`}
+                        className="hidden"
+                        accept={item.accept}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const newFiles = baselineFiles.filter(f => f.label !== item.label);
+                            newFiles.push({ file: e.target.files[0], label: item.label });
+                            setBaselineFiles(newFiles);
+                          }
+                        }}
+                      />
+                      <div 
+                        onClick={() => document.getElementById(`upload-${item.label}`)?.click()}
+                        className={cn(
+                          "mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-5 text-center transition-colors",
+                          existingFile ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                        )}
+                      >
                         <div>
-                          <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
-                          <p className="mt-1.5 text-xs text-muted-foreground">Click to upload</p>
-                          <p className="text-[10px] text-muted-foreground/70">{item.hint}</p>
+                          <Upload className={cn("mx-auto h-6 w-6", existingFile ? "text-primary" : "text-muted-foreground")} />
+                          <p className="mt-1.5 text-xs font-medium">
+                            {existingFile ? existingFile.file.name : 'Click to upload'}
+                          </p>
+                          {!existingFile && <p className="text-[10px] text-muted-foreground/70">{item.hint}</p>}
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
                   <p className="text-sm text-muted-foreground">
@@ -516,7 +590,7 @@ export default function NewProjectPage() {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating project...
+                      {uploadProgress > 0 ? `Uploading files ${uploadProgress}%` : 'Creating project...'}
                     </>
                   ) : (
                     <>

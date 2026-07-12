@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, ShieldCheck, UserPlus, FileCheck, CheckCircle2, XCircle, ExternalLink, Calendar as CalendarIcon, User as UserIcon, Loader2, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, UserPlus, CheckCircle2, XCircle, ExternalLink, Calendar as CalendarIcon, User as UserIcon, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -53,7 +53,7 @@ export default function VerificationRequestsPage() {
     setLoading(true);
     // Note: Due to complex joins, we fetch everything needed
     const { data, error } = await supabase
-      .from('verification_requests')
+      .from('verification_service_requests')
       .select(`
         id, 
         status, 
@@ -89,7 +89,7 @@ export default function VerificationRequestsPage() {
   const handleStatusUpdate = async (reqId: string, newStatus: string) => {
     try {
       const { error } = await supabase
-        .from('verification_requests')
+        .from('verification_service_requests')
         .update({ status: newStatus })
         .eq('id', reqId);
       if (error) throw error;
@@ -131,8 +131,12 @@ export default function VerificationRequestsPage() {
             </TableRow>
           ) : filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center">
-                No requests found in this category.
+              <TableCell colSpan={7} className="h-32 text-center">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <ShieldCheck className="h-8 w-8 opacity-40" />
+                  <p className="text-sm font-medium">No requests found</p>
+                  <p className="text-xs">Try a different filter or category</p>
+                </div>
               </TableCell>
             </TableRow>
           ) : (
@@ -143,7 +147,6 @@ export default function VerificationRequestsPage() {
               const ownerProfile: any = req.projects?.profiles;
               const ownerName = ownerProfile ? (ownerProfile.organization || ownerProfile.full_name || 'Unknown Owner') : 'Unknown Owner';
               const verifierName = req.verifier ? (req.verifier.organization || req.verifier.full_name || 'Unknown Verifier') : 'Unassigned';
-              const priority = 'Medium'; // Mock priority
 
               return (
                 <TableRow key={req.id}>
@@ -167,8 +170,8 @@ export default function VerificationRequestsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="bg-warning/10 text-warning hover:bg-warning/20">
-                      MEDIUM
+                    <Badge variant="secondary" className="bg-muted/50 text-muted-foreground">
+                      —
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -236,13 +239,15 @@ export default function VerificationRequestsPage() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-4 bg-muted/50 p-1">
-          <TabsTrigger value="all" className="rounded-sm">All Requests</TabsTrigger>
-          <TabsTrigger value="land" className="rounded-sm">Land Verification</TabsTrigger>
-          <TabsTrigger value="project" className="rounded-sm">Project Verification</TabsTrigger>
-          <TabsTrigger value="monthly" className="rounded-sm">Monthly Monitoring</TabsTrigger>
-          <TabsTrigger value="corporate" className="rounded-sm">Corporate</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto mb-4">
+          <TabsList className="bg-muted/50 p-1 min-w-max">
+            <TabsTrigger value="all" className="rounded-sm whitespace-nowrap">All Requests</TabsTrigger>
+            <TabsTrigger value="land" className="rounded-sm whitespace-nowrap">Land Verification</TabsTrigger>
+            <TabsTrigger value="project" className="rounded-sm whitespace-nowrap">Project Verification</TabsTrigger>
+            <TabsTrigger value="monthly" className="rounded-sm whitespace-nowrap">Monthly Monitoring</TabsTrigger>
+            <TabsTrigger value="corporate" className="rounded-sm whitespace-nowrap">Corporate</TabsTrigger>
+          </TabsList>
+        </div>
         
         <Card>
           <CardContent className="p-0">

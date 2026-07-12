@@ -3,21 +3,19 @@
 import * as React from 'react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
-import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  DollarSign, Clock, HandHeart, TrendingUp, CheckCircle2, XCircle,
-  AlertCircle, FileText, ArrowRight,
+  DollarSign, Clock, HandHeart, TrendingUp, ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import type { FundingContribution, Project } from '@/lib/types';
+import type { ProjectSupport, Project } from '@/lib/types';
 
 export default function FundingCenterPage() {
   const { user } = useAuth();
-  const [contributions, setContributions] = React.useState<FundingContribution[]>([]);
+  const [contributions, setContributions] = React.useState<ProjectSupport[]>([]);
   const [projects, setProjects] = React.useState<Record<string, Project>>({});
   const [loading, setLoading] = React.useState(true);
 
@@ -26,11 +24,11 @@ export default function FundingCenterPage() {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from('funding_contributions')
+        .from('project_support')
         .select('*')
         .eq('partner_id', user.id)
         .order('created_at', { ascending: false });
-      const contribs = (data as FundingContribution[]) || [];
+      const contribs = (data as ProjectSupport[]) || [];
       setContributions(contribs);
 
       if (contribs.length > 0) {
@@ -48,14 +46,14 @@ export default function FundingCenterPage() {
   }, [user]);
 
   const totalFunded = contributions.filter((c) => c.status === 'completed').reduce((s, c) => s + c.amount_usd, 0);
-  const totalPledged = contributions.filter((c) => c.status === 'pledged').reduce((s, c) => s + c.amount_usd, 0);
+  const totalPending = contributions.filter((c) => c.status === 'pending').reduce((s, c) => s + c.amount_usd, 0);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Funding Center</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Support Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Support verified restoration projects and track your funding portfolio
+          Support verified restoration projects and track your commitments
         </p>
       </div>
 
@@ -70,7 +68,7 @@ export default function FundingCenterPage() {
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><Clock className="h-5 w-5" /></div>
-            <div><p className="text-xs text-muted-foreground">Pledged</p><p className="font-display text-xl font-semibold">${totalPledged.toLocaleString()}</p></div>
+            <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-display text-xl font-semibold">${totalPending.toLocaleString()}</p></div>
           </div>
         </Card>
         <Card className="p-5">
@@ -85,7 +83,7 @@ export default function FundingCenterPage() {
       <Card className="flex flex-col items-center justify-between gap-4 p-6 sm:flex-row">
         <div>
           <h2 className="font-semibold">Looking for projects to support?</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Browse verified restoration projects seeking funding</p>
+          <p className="mt-1 text-sm text-muted-foreground">Browse verified restoration projects seeking support</p>
         </div>
         <Button asChild>
           <Link href="/dashboard/discover">Discover Projects<ArrowRight className="ml-2 h-4 w-4" /></Link>
@@ -94,13 +92,13 @@ export default function FundingCenterPage() {
 
       {/* Funding History */}
       <Card className="p-5">
-        <h2 className="mb-4 font-semibold">Funding History</h2>
+        <h2 className="mb-4 font-semibold">Support History</h2>
         {loading ? (
           <div className="flex items-center justify-center py-8"><Clock className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : contributions.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
             <HandHeart className="h-10 w-10 text-muted-foreground/40" />
-            <div><p className="font-medium">No funding yet</p><p className="mt-1 text-sm text-muted-foreground">Start supporting projects from the discovery hub</p></div>
+            <div><p className="font-medium">No support yet</p><p className="mt-1 text-sm text-muted-foreground">Start supporting projects from the discovery hub</p></div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -117,7 +115,7 @@ export default function FundingCenterPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                    <Badge variant="secondary" className={cn('capitalize', c.status === 'completed' ? 'bg-success/10 text-success' : c.status === 'pledged' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-destructive/10 text-destructive')}>
+                    <Badge variant="secondary" className={cn('capitalize', c.status === 'completed' ? 'bg-success/10 text-success' : c.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-destructive/10 text-destructive')}>
                       {c.status}
                     </Badge>
                     {project && (

@@ -28,6 +28,7 @@ import {
   Gavel,
   CheckCircle2,
   Eye,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   PROJECT_TYPE_LABELS,
@@ -39,13 +40,14 @@ const OWNER_TABS = [
   { label: 'Overview', href: '', icon: LayoutDashboard },
   { label: 'Map', href: '/map', icon: Map },
   { label: 'Timeline', href: '/timeline', icon: Activity },
+  { label: 'Verification', href: '/verification', icon: ShieldCheck },
   { label: 'Evidence', href: '/evidence', icon: Upload },
   { label: 'Monitoring', href: '/monitoring', icon: ClipboardList },
   { label: 'Documents', href: '/documents', icon: FileText },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Revenue', href: '/revenue', icon: DollarSign },
   { label: 'Carbon Passport', href: '/passport', icon: Award },
-  { label: 'Funding', href: '/funding', icon: DollarSign },
+  { label: 'Support', href: '/funding', icon: DollarSign },
   { label: 'Calendar', href: '/calendar', icon: CalendarDays },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -70,9 +72,9 @@ const PARTNER_TABS = [
   { label: 'Evidence', href: '/evidence', icon: Eye },
   { label: 'Monitoring', href: '/monitoring', icon: ClipboardList },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
-  { label: 'Funding', href: '/funding', icon: DollarSign },
+  { label: 'Support', href: '/funding', icon: DollarSign },
   { label: 'Carbon Passport', href: '/passport', icon: Award },
-  { label: 'Activity', href: '/timeline', icon: Activity },
+  { label: 'Discussion', href: '/discussion', icon: MessageSquare },
 ];
 
 export default function ProjectWorkspaceLayout({

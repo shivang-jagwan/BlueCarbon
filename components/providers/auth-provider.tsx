@@ -43,7 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
       if (error) {
-        console.error('Failed to load profile:', error.message);
         return null;
       }
       return data as Profile;
@@ -84,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.error('Sign out error:', e);
+      // Sign out may fail if session is already expired
     } finally {
       setState({
         user: null,

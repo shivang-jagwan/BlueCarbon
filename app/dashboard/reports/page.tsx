@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3, FileText, Download, TrendingUp, DollarSign, Leaf,
-  Calendar, Award, Building2, Users,
+  Calendar, Award, Building2,
 } from 'lucide-react';
 
 const OWNER_REPORTS = [
@@ -32,7 +32,7 @@ const PARTNER_REPORTS = [
   { id: 'esg', label: 'ESG Report', icon: BarChart3, desc: 'Environmental, Social, and Governance impact' },
   { id: 'csr', label: 'CSR Report', icon: FileText, desc: 'Corporate Social Responsibility report' },
   { id: 'carbon', label: 'Carbon Impact Report', icon: Leaf, desc: 'Carbon sequestration from funded projects' },
-  { id: 'funding', label: 'Funding Report', icon: DollarSign, desc: 'Funding allocation and utilization' },
+  { id: 'funding', label: 'Support Report', icon: DollarSign, desc: 'Support allocation and utilization' },
   { id: 'ngo', label: 'NGO Assessment', icon: Building2, desc: 'Verifier performance assessment' },
   { id: 'annual', label: 'Annual Sustainability Report', icon: TrendingUp, desc: 'Yearly sustainability impact' },
 ];

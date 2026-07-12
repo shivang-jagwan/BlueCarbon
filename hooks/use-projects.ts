@@ -2,19 +2,35 @@
 
 import * as React from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { Project, ProjectActivity, ProjectDocument, MonitoringReport, FundingContribution, NotificationItem, VerificationRequest, VerificationDecisionRecord, DiscussionComment } from '@/lib/types';
+import { useAuth } from '@/components/providers/auth-provider';
+import type { Project, ProjectActivity, ProjectFile, MonitoringReport, ProjectSupport, NotificationItem, VerificationServiceRequest, VerificationDecisionRecord, DiscussionComment } from '@/lib/types';
 
 export function useProjects() {
+  const { user } = useAuth();
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // Filter by owner if the user is a project_owner
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profile?.role === 'project_owner') {
+        query = query.eq('owner_id', user.id);
+      }
+    }
+
+    const { data, error } = await query;
     if (error) {
       setError(error.message);
     } else {
@@ -22,7 +38,7 @@ export function useProjects() {
       setError(null);
     }
     setLoading(false);
-  }, []);
+  }, [user]);
 
   React.useEffect(() => {
     load();
@@ -89,23 +105,23 @@ export function useProjectActivity(projectId: string | null) {
   return { activities, loading };
 }
 
-export function useProjectDocuments(projectId: string | null) {
-  const [documents, setDocuments] = React.useState<ProjectDocument[]>([]);
+export function useProjectFiles(projectId: string | null) {
+  const [files, setFiles] = React.useState<ProjectFile[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const load = React.useCallback(async () => {
     if (!projectId) {
-      setDocuments([]);
+      setFiles([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     const { data } = await supabase
-      .from('project_documents')
+      .from('project_files')
       .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
-    setDocuments((data as ProjectDocument[]) || []);
+    setFiles((data as ProjectFile[]) || []);
     setLoading(false);
   }, [projectId]);
 
@@ -113,7 +129,7 @@ export function useProjectDocuments(projectId: string | null) {
     load();
   }, [load]);
 
-  return { documents, loading, refetch: load };
+  return { files, loading, refetch: load };
 }
 
 export function useMonitoringReports(projectId: string | null) {
@@ -143,8 +159,8 @@ export function useMonitoringReports(projectId: string | null) {
   return { reports, loading, refetch: load };
 }
 
-export function useFunding(projectId: string | null) {
-  const [contributions, setContributions] = React.useState<FundingContribution[]>([]);
+export function useProjectSupport(projectId: string | null) {
+  const [contributions, setContributions] = React.useState<ProjectSupport[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const load = React.useCallback(async () => {
@@ -155,11 +171,11 @@ export function useFunding(projectId: string | null) {
     }
     setLoading(true);
     const { data } = await supabase
-      .from('funding_contributions')
+      .from('project_support')
       .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
-    setContributions((data as FundingContribution[]) || []);
+    setContributions((data as ProjectSupport[]) || []);
     setLoading(false);
   }, [projectId]);
 
@@ -169,6 +185,7 @@ export function useFunding(projectId: string | null) {
 
   return { contributions, loading, refetch: load };
 }
+export const useFunding = useProjectSupport; // backward compat alias
 
 export function useNotifications() {
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
@@ -193,7 +210,7 @@ export function useNotifications() {
 }
 
 export function useVerificationRequests(verifierId: string | null) {
-  const [requests, setRequests] = React.useState<VerificationRequest[]>([]);
+  const [requests, setRequests] = React.useState<VerificationServiceRequest[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const load = React.useCallback(async () => {
@@ -204,11 +221,11 @@ export function useVerificationRequests(verifierId: string | null) {
     }
     setLoading(true);
     const { data } = await supabase
-      .from('verification_requests')
-      .select('*')
+      .from('verification_service_requests')
+      .select('*, projects(name, owner_id)')
       .eq('verifier_id', verifierId)
       .order('created_at', { ascending: false });
-    setRequests((data as VerificationRequest[]) || []);
+    setRequests((data as VerificationServiceRequest[]) || []);
     setLoading(false);
   }, [verifierId]);
 
@@ -233,7 +250,7 @@ export function useVerificationDecisions(requestId: string | null) {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from('verification_decisions')
+        .from('verification_service_decisions')
         .select('*')
         .eq('request_id', requestId)
         .order('created_at', { ascending: false });
@@ -287,11 +304,17 @@ export function useAssignedProjects(verifierId: string | null) {
     }
     setLoading(true);
     const { data } = await supabase
-      .from('projects')
-      .select('*')
+      .from('project_partnerships')
+      .select('projects(*)')
       .eq('verifier_id', verifierId)
-      .order('updated_at', { ascending: false });
-    setProjects((data as Project[]) || []);
+      .eq('status', 'active');
+    
+    if (data) {
+      const activeProjects = data.map((d: any) => d.projects).filter(Boolean);
+      setProjects(activeProjects);
+    } else {
+      setProjects([]);
+    }
     setLoading(false);
   }, [verifierId]);
 
@@ -300,4 +323,123 @@ export function useAssignedProjects(verifierId: string | null) {
   }, [load]);
 
   return { projects, loading, refetch: load };
+}
+
+export function useProjectPartnerships(projectId: string | null) {
+  const [partnerships, setPartnerships] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const load = React.useCallback(async () => {
+    if (!projectId) {
+      setPartnerships([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    let rows: any[] = [];
+
+    const { data, error } = await supabase
+      .from('project_partnerships')
+      .select('*, profiles!project_partnerships_company_id_fkey(full_name, organization), verifier:profiles!project_partnerships_verifier_id_fkey(full_name, organization), owner:profiles!project_partnerships_owner_id_fkey(full_name, organization)')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      const { data: fallback } = await supabase
+        .from('project_partnerships')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+      rows = fallback || [];
+    } else {
+      rows = data || [];
+    }
+
+    setPartnerships(rows);
+    setLoading(false);
+  }, [projectId]);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  return { partnerships, loading, refetch: load };
+}
+
+export function useCarbonPassport(projectId: string | null) {
+  const [passport, setPassport] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  const load = React.useCallback(async () => {
+    if (!projectId) {
+      setPassport(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const { data } = await supabase
+      .from('carbon_passports')
+      .select('*')
+      .eq('project_id', projectId)
+      .maybeSingle();
+    setPassport(data || null);
+    setLoading(false);
+  }, [projectId]);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  return { passport, loading, refetch: load };
+}
+
+export async function issueCarbonPassport(projectId: string, verifierId: string, ownerId: string) {
+  try {
+    // Insert passport record
+    const { data: passport, error: passportError } = await supabase
+      .from('carbon_passports')
+      .insert({
+        project_id: projectId,
+        issued_by: verifierId,
+        status: 'active',
+        // certificate_url will be added later in a real implementation
+      })
+      .select()
+      .single();
+
+    if (passportError) throw passportError;
+
+    // Update project status
+    const { error: projectError } = await supabase
+      .from('projects')
+      .update({
+        passport_issued_at: new Date().toISOString(),
+        status: 'verified',
+      })
+      .eq('id', projectId);
+
+    if (projectError) throw projectError;
+
+    // Log Activity
+    await supabase.from('project_activity').insert({
+      project_id: projectId,
+      actor_id: verifierId,
+      event_type: 'passport_issued',
+      title: 'Carbon Passport Issued',
+      description: `Carbon Passport ${passport.id.split('-')[0].toUpperCase()} issued by Verifier.`,
+    });
+
+    // Notify Owner
+    await supabase.from('notifications').insert({
+      user_id: ownerId,
+      title: 'Carbon Passport Issued!',
+      body: 'Your project has officially received its Carbon Passport.',
+      type: 'verification',
+      link: `/dashboard/projects/${projectId}/passport`,
+    });
+
+    return { data: passport, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }

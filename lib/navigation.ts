@@ -69,7 +69,7 @@ export const VERIFIER_NAV: NavSection[] = [
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Verification Center', href: '/dashboard/verification', icon: ShieldCheck },
-      { label: 'Assigned Projects', href: '/dashboard/projects', icon: FolderKanban },
+      { label: 'Monitoring Projects', href: '/dashboard/projects', icon: FolderKanban },
     ],
   },
   {
@@ -95,6 +95,7 @@ export const PARTNER_NAV: NavSection[] = [
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Discover Projects', href: '/dashboard/discover', icon: Globe },
+      { label: 'Saved Projects', href: '/dashboard/saved-projects', icon: FolderKanban },
       { label: 'Compare Projects', href: '/dashboard/compare', icon: GitCompare },
     ],
   },
@@ -102,7 +103,7 @@ export const PARTNER_NAV: NavSection[] = [
     title: 'Engage',
     items: [
       { label: 'Verifier Directory', href: '/dashboard/verifiers', icon: Building2 },
-      { label: 'Funding Center', href: '/dashboard/funding', icon: DollarSign },
+      { label: 'Support Center', href: '/dashboard/funding', icon: DollarSign },
       { label: 'Impact Dashboard', href: '/dashboard/impact', icon: BarChart3 },
       { label: 'Reports', href: '/dashboard/reports', icon: FileText },
     ],

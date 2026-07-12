@@ -21,11 +21,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, ExternalLink, Archive, Ban, Trash2, MapPin, DollarSign, Activity, Loader2, Download } from 'lucide-react';
+import { Search, MoreHorizontal, ExternalLink, Archive, Ban, Trash2, MapPin, DollarSign, Activity, Loader2, Download, TreePine } from 'lucide-react';
 import { ProjectStatus } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { usePagination } from '@/hooks/use-pagination';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 const statusColor = (status: ProjectStatus) => {
   switch (status) {
@@ -105,6 +107,8 @@ export default function ProjectManagementPage() {
     return nameStr.includes(search) || ownerStr.includes(search);
   });
 
+  const { page, totalPages, paginatedItems, setPage } = usePagination(filteredProjects, 20);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -138,12 +142,12 @@ export default function ProjectManagementPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
-                <TableHead>Owner</TableHead>
-                <TableHead>Location & Area</TableHead>
+                <TableHead className="hidden sm:table-cell">Owner</TableHead>
+                <TableHead className="hidden md:table-cell">Location & Area</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Health Score</TableHead>
-                <TableHead>Funding</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead className="hidden lg:table-cell">Health Score</TableHead>
+                <TableHead className="hidden lg:table-cell">Support Goal</TableHead>
+                <TableHead className="hidden md:table-cell">Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -159,12 +163,16 @@ export default function ProjectManagementPage() {
                 </TableRow>
               ) : filteredProjects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
-                    No projects found.
+                  <TableCell colSpan={8} className="h-32 text-center">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <TreePine className="h-8 w-8 opacity-40" />
+                      <p className="text-sm font-medium">No projects found</p>
+                      <p className="text-xs">Try adjusting your search or filters</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredProjects.map((proj) => {
+                paginatedItems.map((proj) => {
                   const ownerName = proj.profiles?.organization || proj.profiles?.full_name || 'Unknown Owner';
                   const locationStr = proj.location_lat && proj.location_lng 
                     ? `${proj.location_lat.toFixed(2)}, ${proj.location_lng.toFixed(2)}` 
@@ -180,10 +188,10 @@ export default function ProjectManagementPage() {
                           <span className="text-xs text-muted-foreground">{proj.id.substring(0, 8)}...</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <span className="text-sm">{ownerName}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <MapPin className="h-3 w-3" /> {locationStr}
@@ -196,7 +204,7 @@ export default function ProjectManagementPage() {
                           {proj.status.replace('_', ' ').toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {proj.health_score !== null ? (
                           <div className="flex items-center gap-2">
                             <Activity className={`h-4 w-4 ${proj.health_score > 80 ? 'text-success' : proj.health_score > 50 ? 'text-warning' : 'text-destructive'}`} />
@@ -206,13 +214,13 @@ export default function ProjectManagementPage() {
                           <span className="text-sm text-muted-foreground">N/A</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-3 w-3 text-muted-foreground" />
                           <span className="text-sm">{fundingStr}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                         {proj.created_at ? format(new Date(proj.created_at), 'MMM d, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -245,6 +253,34 @@ export default function ProjectManagementPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground hidden sm:block">
+            Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, filteredProjects.length)} of {filteredProjects.length} projects
+          </p>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious onClick={() => setPage(page - 1)} className={page === 1 ? 'pointer-events-none opacity-50' : ''} />
+              </PaginationItem>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const pageNum = totalPages <= 5 ? i + 1 : Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink isActive={pageNum === page} onClick={() => setPage(pageNum)}>
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              <PaginationItem>
+                <PaginationNext onClick={() => setPage(page + 1)} className={page === totalPages ? 'pointer-events-none opacity-50' : ''} />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

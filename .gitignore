@@ -27,6 +27,9 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
+.env.development
+.env.production
+.env.staging
 
 # vercel
 .vercel
@@ -34,3 +37,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# root utility scripts (contain credentials, must not be committed)
+create-*.js
+check-*.js
+apply-*.js
+approve-*.js
+debug-*.js
+test-*.js
+
+# bolt
+.bolt

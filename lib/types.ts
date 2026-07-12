@@ -39,7 +39,7 @@ export type OwnershipType = 'private' | 'government' | 'community' | 'leased';
 
 export type MonitoringStatus = 'draft' | 'submitted' | 'reviewed' | 'approved';
 
-export type FundingStatus = 'pledged' | 'completed' | 'refunded';
+export type SupportStatus = 'pending' | 'active' | 'completed' | 'terminated';
 
 export interface Profile {
   id: string;
@@ -81,6 +81,8 @@ export interface Profile {
   projects_verified_count: number | null;
   pricing_info: Record<string, unknown> | null;
   availability_status: 'accepting' | 'limited' | 'unavailable';
+  languages_spoken: string[] | null;
+  average_response_time: string | null;
   industry: string | null;
   cin: string | null;
   gst: string | null;
@@ -110,7 +112,6 @@ export interface Project {
   verified_carbon_tonnes: number | null;
   start_date: string | null;
   end_date: string | null;
-  verifier_id: string | null;
   verification_status: VerificationStatus;
   passport_issued_at: string | null;
   objectives: string | null;
@@ -127,15 +128,17 @@ export interface Project {
   updated_at: string;
 }
 
-export interface ProjectDocument {
+export interface ProjectFile {
   id: string;
   project_id: string;
   uploaded_by: string;
-  name: string;
-  file_path: string;
+  file_name: string;
+  file_type: string | null;
+  category: string;
+  storage_path: string;
+  public_url: string | null;
   file_size: number | null;
   mime_type: string | null;
-  category: string;
   created_at: string;
 }
 
@@ -152,13 +155,13 @@ export interface MonitoringReport {
   created_at: string;
 }
 
-export interface FundingContribution {
+export interface ProjectSupport {
   id: string;
   project_id: string;
   partner_id: string;
   amount_usd: number;
   carbon_credits_tonnes: number | null;
-  status: FundingStatus;
+  status: SupportStatus;
   created_at: string;
 }
 
@@ -186,19 +189,47 @@ export interface ProjectActivity {
 
 export type VerificationRequestType = 'land' | 'project' | 'corporate' | 'monthly';
 export type VerificationPriority = 'high' | 'medium' | 'low';
-export type VerificationRequestStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested';
+export type VerificationServiceRequestStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested';
+export type VerificationRequestStatus = VerificationServiceRequestStatus; // backward compat alias
 export type VerificationDecision = 'approved' | 'rejected' | 'changes_requested';
 
-export interface VerificationRequest {
+export interface VerificationServiceRequest {
   id: string;
   project_id: string;
   verifier_id: string;
   request_type: VerificationRequestType;
   priority: VerificationPriority;
-  status: VerificationRequestStatus;
+  status: VerificationServiceRequestStatus;
   due_date: string | null;
   corporate_partner_id: string | null;
   description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type VerificationRequest = VerificationServiceRequest; // backward compat alias
+
+export interface CarbonPassport {
+  id: string;
+  project_id: string;
+  issued_by: string;
+  status: 'active' | 'revoked';
+  certificate_url: string | null;
+  created_at: string;
+}
+
+export interface ProjectPartnership {
+  id: string;
+  project_id: string;
+  company_id: string;
+  verifier_id: string;
+  owner_id: string;
+  status: 'pending_owner' | 'pending_verifier' | 'active' | 'rejected' | 'terminated';
+  service_type: 'monthly' | 'quarterly' | 'annual' | 'lifecycle';
+  start_date: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  budget_usd: number | null;
+  message: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -222,6 +253,32 @@ export interface DiscussionComment {
   body: string;
   attachments: Record<string, unknown> | null;
   created_at: string;
+}
+
+export type CalendarEventType = 'verification' | 'monthly_monitoring' | 'site_visit' | 'drone_survey' | 'project_deadline' | 'meeting' | 'reminder' | 'support_review' | 'ngo_visit' | 'custom';
+export type CalendarEventStatus = 'upcoming' | 'completed' | 'cancelled' | 'overdue';
+export type CalendarEventPriority = 'high' | 'medium' | 'low';
+
+export interface CalendarEvent {
+  id: string;
+  project_id: string | null;
+  created_by: string;
+  assigned_to: string | null;
+  title: string;
+  description: string | null;
+  event_type: CalendarEventType | string;
+  status: CalendarEventStatus;
+  priority: CalendarEventPriority;
+  start_date: string;
+  end_date: string;
+  all_day: boolean;
+  location: string | null;
+  meeting_link: string | null;
+  color: string | null;
+  notes: string | null;
+  attachments: string[] | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export namespace GeoJSON {
@@ -340,7 +397,7 @@ export const VERIFICATION_PRIORITY_LABELS: Record<VerificationPriority, string> 
   low: 'Low',
 };
 
-export const VERIF_REQUEST_STATUS_LABELS: Record<VerificationRequestStatus, string> = {
+export const VERIF_REQUEST_STATUS_LABELS: Record<VerificationServiceRequestStatus, string> = {
   pending: 'Pending',
   in_review: 'In Review',
   approved: 'Approved',
@@ -354,8 +411,8 @@ export const VERIFICATION_DECISION_LABELS: Record<VerificationDecision, string> 
   changes_requested: 'Changes Requested',
 };
 
-export function verificationStatusColor(status: VerificationRequestStatus): string {
-  const map: Record<VerificationRequestStatus, string> = {
+export function verificationStatusColor(status: VerificationServiceRequestStatus): string {
+  const map: Record<VerificationServiceRequestStatus, string> = {
     pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
     in_review: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     approved: 'bg-success/10 text-success',

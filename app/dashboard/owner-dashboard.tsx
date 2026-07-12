@@ -9,43 +9,16 @@ import { ProjectCard } from '@/components/shared/project-card';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  FolderKanban,
-  Sprout,
-  ShieldCheck,
-  Award,
-  DollarSign,
-  CalendarDays,
-  Bell,
-  ArrowRight,
-  Plus,
-  Search,
-  Building2,
-  FileText,
-  CheckCircle2,
-} from 'lucide-react';
+import { FolderKanban, Sprout, ShieldCheck, Award, DollarSign, Bell, ArrowRight, Plus, Search, Building2, FileText, CheckCircle2 } from 'lucide-react';
+import { UpcomingEventsWidget } from '@/components/shared/calendar/UpcomingEventsWidget';
 import { getRoleLabel } from '@/lib/navigation';
 
 const QUICK_ACTIONS = [
   { label: 'Register New Project', href: '/dashboard/projects/new', icon: Plus, color: 'text-primary' },
-  { label: 'Browse Funding', href: '/dashboard/discover', icon: Search, color: 'text-accent' },
+  { label: 'Browse Support', href: '/dashboard/discover', icon: Search, color: 'text-accent' },
   { label: 'Find Verifier', href: '/dashboard/verifiers', icon: Building2, color: 'text-warning' },
   { label: 'View Reports', href: '/dashboard/reports', icon: FileText, color: 'text-success' },
 ];
-
-const CALENDAR_EVENTS = [
-  { title: 'Monthly Verification Due', date: 'Jul 15', type: 'verification' },
-  { title: 'Drone Survey', date: 'Jul 18', type: 'survey' },
-  { title: 'NGO Site Visit', date: 'Jul 22', type: 'visit' },
-  { title: 'Report Submission', date: 'Jul 30', type: 'report' },
-];
-
-const EVENT_COLORS: Record<string, string> = {
-  verification: 'bg-amber-500',
-  survey: 'bg-blue-500',
-  visit: 'bg-success',
-  report: 'bg-primary',
-};
 
 export default function OwnerDashboard() {
   const { profile } = useAuth();
@@ -71,7 +44,7 @@ export default function OwnerDashboard() {
         <KpiCard label="Total Projects" value={projects.length} hint={loading ? 'Loading...' : `${activeProjects} active`} icon={FolderKanban} />
         <KpiCard label="Pending Verifications" value={pendingVerifications} hint={pendingVerifications > 0 ? 'Awaiting review' : 'All clear'} icon={ShieldCheck} />
         <KpiCard label="Carbon Passports" value={passportsIssued} hint={passportsIssued > 0 ? 'Issued' : 'None yet'} icon={Award} />
-        <KpiCard label="Funding Received" value="$0" hint="Total to date" icon={DollarSign} />
+        <KpiCard label="Support Received" value={projects.reduce((sum, p) => sum + (p.verified_carbon_tonnes ?? 0), 0) > 0 ? `${projects.reduce((sum, p) => sum + (p.verified_carbon_tonnes ?? 0), 0).toLocaleString()} t` : '—'} hint="Carbon credits" icon={DollarSign} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -114,18 +87,7 @@ export default function OwnerDashboard() {
           )}
         </div>
         <div className="space-y-6">
-          <Card className="p-5">
-            <div className="mb-4 flex items-center gap-2"><CalendarDays className="h-4.5 w-4.5 text-primary" /><h3 className="font-semibold">Upcoming</h3></div>
-            <div className="space-y-3">
-              {CALENDAR_EVENTS.map((event, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${EVENT_COLORS[event.type]}`} />
-                  <div className="flex-1"><p className="text-sm font-medium leading-tight">{event.title}</p><p className="text-xs text-muted-foreground">{event.date}</p></div>
-                </div>
-              ))}
-            </div>
-            <Button asChild variant="ghost" size="sm" className="mt-4 w-full"><Link href="/dashboard/calendar">View Calendar<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Link></Button>
-          </Card>
+          <UpcomingEventsWidget />
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2"><Bell className="h-4.5 w-4.5 text-primary" /><h3 className="font-semibold">Notifications</h3></div>

@@ -5,6 +5,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -12,16 +13,66 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Globe, Bell, Lock, Moon, Sun, LogOut } from 'lucide-react';
+import { Globe, Bell, Lock, Moon, Sun, LogOut, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase/client';
 
 export default function SettingsPage() {
-  const { signOut } = useAuth();
+  const { signOut, user, refreshProfile } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [language, setLanguage] = React.useState('en');
+  const [fullName, setFullName] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [changingPassword, setChangingPassword] = React.useState(false);
+  const [password, setPassword] = React.useState('');
   const [notifEmail, setNotifEmail] = React.useState(true);
   const [notifPush, setNotifPush] = React.useState(true);
+
+  React.useEffect(() => {
+    if (user) {
+      supabase.from('profiles').select('full_name, phone').eq('id', user.id).single().then(({ data }: { data: any }) => {
+        if (data) {
+          setFullName(data.full_name || '');
+          setPhone(data.phone || '');
+        }
+      });
+    }
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName, phone })
+        .eq('id', user.id);
+      if (error) throw error;
+      toast.success('Profile updated');
+      await refreshProfile();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update');
+    }
+    setSaving(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (!password || password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      toast.success('Password updated');
+      setPassword('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change password');
+    }
+    setChangingPassword(false);
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -31,6 +82,28 @@ export default function SettingsPage() {
           Manage your preferences, security, and account
         </p>
       </div>
+
+      {/* Profile */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Globe className="h-4.5 w-4.5 text-primary" />
+          <h2 className="font-semibold">Profile</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="fullName">Full Name</Label>
+            <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <Button onClick={handleSaveProfile} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save Profile
+          </Button>
+        </div>
+      </Card>
 
       {/* Appearance */}
       <Card className="p-6">
@@ -61,29 +134,6 @@ export default function SettingsPage() {
               Dark
             </Button>
           </div>
-        </div>
-      </Card>
-
-      {/* Language */}
-      <Card className="p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <Globe className="h-4.5 w-4.5 text-primary" />
-          <h2 className="font-semibold">Language & Region</h2>
-        </div>
-        <div>
-          <Label>Language</Label>
-          <Select value={language} onValueChange={setLanguage}>
-            <SelectTrigger className="mt-1.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="hi">Hindi</SelectItem>
-              <SelectItem value="id">Bahasa Indonesia</SelectItem>
-              <SelectItem value="es">Español</SelectItem>
-              <SelectItem value="fr">Français</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </Card>
 
@@ -121,12 +171,23 @@ export default function SettingsPage() {
           <Lock className="h-4.5 w-4.5 text-primary" />
           <h2 className="font-semibold">Security</h2>
         </div>
-        <div className="space-y-3">
-          <Button variant="outline" className="w-full justify-start">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="newPassword">New Password</Label>
+            <Input
+              id="newPassword"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter new password"
+            />
+          </div>
+          <Button variant="outline" onClick={handleChangePassword} disabled={changingPassword}>
+            {changingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Change Password
           </Button>
-          <Button variant="outline" className="w-full justify-start">
-            Two-Factor Authentication
+          <Button variant="outline" disabled className="text-muted-foreground">
+            Two-Factor Authentication (Coming Soon)
           </Button>
         </div>
       </Card>
@@ -146,9 +207,9 @@ export default function SettingsPage() {
           <Button
             variant="outline"
             className="w-full justify-start text-destructive hover:text-destructive"
-            onClick={() => toast.info('Contact support to delete your account')}
+            disabled
           >
-            Delete Account
+            Delete Account (Contact Support)
           </Button>
         </div>
       </Card>

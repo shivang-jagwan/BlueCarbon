@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { FileUpload } from '@/components/shared/FileUpload';
 import {
   Gavel,
   CheckCircle2,
@@ -19,7 +20,6 @@ import {
   AlertCircle,
   Clock,
   History,
-  Upload,
   ShieldCheck,
 } from 'lucide-react';
 import {
@@ -41,6 +41,7 @@ export default function DecisionPage() {
   const [remarks, setRemarks] = React.useState('');
   const [justification, setJustification] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
+  const [uploadedFilePath, setUploadedFilePath] = React.useState<string | null>(null);
 
   // Find the active request for this project
   const projectRequests = requests.filter((r) => r.project_id === projectId);
@@ -64,7 +65,7 @@ export default function DecisionPage() {
     setSubmitting(true);
     try {
       // Insert decision record
-      const { error: decError } = await supabase.from('verification_decisions').insert({
+      const { error: decError } = await supabase.from('verification_service_decisions').insert({
         request_id: selectedRequestId,
         verifier_id: user.id,
         decision,
@@ -80,7 +81,7 @@ export default function DecisionPage() {
         changes_requested: 'changes_requested',
       };
       const { error: reqError } = await supabase
-        .from('verification_requests')
+        .from('verification_service_requests')
         .update({ status: statusMap[decision] })
         .eq('id', selectedRequestId);
       if (reqError) throw reqError;
@@ -229,11 +230,18 @@ export default function DecisionPage() {
               </div>
               <div>
                 <Label>Supporting Files (Optional)</Label>
-                <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-5 text-center transition-colors hover:border-primary/40">
-                  <div>
-                    <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
-                    <p className="mt-1.5 text-xs text-muted-foreground">Click to upload supporting documents</p>
-                  </div>
+                <div className="mt-1.5">
+                  <FileUpload
+                    bucket="evidence"
+                    category="decision_support"
+                    projectId={projectId}
+                    allowedTypes={['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
+                    maxSizeMB={20}
+                    onUploadSuccess={(file) => setUploadedFilePath(file.storage_path)}
+                  />
+                  {uploadedFilePath && (
+                    <p className="mt-1 text-xs text-success">File uploaded successfully</p>
+                  )}
                 </div>
               </div>
               <Button

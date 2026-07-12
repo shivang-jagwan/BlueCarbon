@@ -29,12 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Download, MoreHorizontal, Shield, Ban, Trash2, Key, Edit, Eye, Loader2 } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Shield, Ban, Trash2, Eye, Loader2, Users } from 'lucide-react';
 import { getRoleLabel } from '@/lib/navigation';
 import { AppRole, Profile, ApprovalStatus } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { usePagination } from '@/hooks/use-pagination';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 export default function UserManagementPage() {
   const [users, setUsers] = React.useState<Profile[]>([]);
@@ -89,6 +91,8 @@ export default function UserManagementPage() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const { page, totalPages, paginatedItems, setPage } = usePagination(filteredUsers, 20);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -104,7 +108,7 @@ export default function UserManagementPage() {
 
       <Card>
         <CardHeader className="p-4 sm:px-6 sm:py-4 border-b border-border">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -116,7 +120,7 @@ export default function UserManagementPage() {
             </div>
             <div className="flex items-center gap-2">
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by Role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -129,7 +133,7 @@ export default function UserManagementPage() {
               </Select>
               
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-full sm:w-[140px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -150,8 +154,8 @@ export default function UserManagementPage() {
                 <TableHead className="w-[250px]">User</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>KYC</TableHead>
-                <TableHead>Registered</TableHead>
+                <TableHead className="hidden md:table-cell">KYC</TableHead>
+                <TableHead className="hidden lg:table-cell">Registered</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -165,14 +169,18 @@ export default function UserManagementPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredUsers.length === 0 ? (
+              ) : paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    No users found.
+                  <TableCell colSpan={6} className="h-32 text-center">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Users className="h-8 w-8 opacity-40" />
+                      <p className="text-sm font-medium">No users found</p>
+                      <p className="text-xs">Try adjusting your search or filters</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => {
+                paginatedItems.map((user) => {
                   const displayName = user.full_name || user.organization || 'Unnamed User';
                   const initials = displayName.split(' ').map((n) => n[0]).join('').substring(0, 2);
                   return (
@@ -205,7 +213,7 @@ export default function UserManagementPage() {
                           {user.approval_status.charAt(0).toUpperCase() + user.approval_status.slice(1)}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Badge 
                           variant="outline" 
                           className={
@@ -217,7 +225,7 @@ export default function UserManagementPage() {
                           {user.kyc_status || 'pending'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                         {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -255,6 +263,34 @@ export default function UserManagementPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground hidden sm:block">
+            Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, filteredUsers.length)} of {filteredUsers.length} users
+          </p>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious onClick={() => setPage(page - 1)} className={page === 1 ? 'pointer-events-none opacity-50' : ''} />
+              </PaginationItem>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const pageNum = totalPages <= 5 ? i + 1 : Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink isActive={pageNum === page} onClick={() => setPage(pageNum)}>
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              <PaginationItem>
+                <PaginationNext onClick={() => setPage(page + 1)} className={page === totalPages ? 'pointer-events-none opacity-50' : ''} />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

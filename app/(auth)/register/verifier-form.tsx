@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
 import { ORGANIZATION_TYPES, VERIFICATION_SERVICES } from '@/lib/types';
+import { uploadFile } from '@/services/storage';
 
 const schema = z.object({
   organization_name: z.string().min(2, 'Organization name is required'),
@@ -78,6 +79,7 @@ export default function VerifierRegisterForm() {
   const [step, setStep] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [services, setServices] = React.useState<string[]>([]);
+  const [verificationFiles, setVerificationFiles] = React.useState<{ file: File; label: string }[]>([]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -174,6 +176,31 @@ export default function VerifierRegisterForm() {
           kyc_status: 'submitted',
           profile_completed: true,
         });
+      }
+      
+      // We don't automatically sign in verifiers because they wait for admin approval
+      // but we can upload their KYC documents before redirecting!
+      
+      if (verificationFiles.length > 0) {
+        toast.loading('Uploading verification documents...');
+        // First we need to sign them in temporarily to upload since we need auth to upload
+        await supabase.auth.signInWithPassword({
+          email: values.email,
+          password: values.password,
+        });
+
+        for (const item of verificationFiles) {
+          try {
+            await uploadFile(item.file, 'profile-documents', item.label.toLowerCase().replace(/ /g, '_'));
+          } catch (e) {
+            // Upload failure is non-blocking — profile is already created
+            console.error('Document upload error:', e);
+          }
+        }
+        
+        // Sign out again so they are pending approval
+        await supabase.auth.signOut();
+        toast.dismiss();
       }
 
       toast.success('Registration submitted! Awaiting admin verification.');
@@ -276,7 +303,7 @@ export default function VerifierRegisterForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Organization Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {ORGANIZATION_TYPES.map((t) => (
@@ -416,23 +443,46 @@ export default function VerifierRegisterForm() {
                   </p>
                 </div>
                 {[
-                  { label: 'NGO Registration Certificate', hint: 'PDF up to 10MB' },
-                  { label: 'Accreditation Certificate', hint: 'PDF up to 10MB' },
-                  { label: 'Government Recognition Letter', hint: 'PDF up to 10MB' },
-                  { label: 'PAN Card', hint: 'PDF, JPG up to 5MB' },
-                  { label: 'GST Certificate (Optional)', hint: 'PDF up to 5MB' },
-                ].map((doc) => (
+                  { label: 'NGO Registration Certificate', hint: 'PDF up to 10MB', accept: '.pdf' },
+                  { label: 'Accreditation Certificate', hint: 'PDF up to 10MB', accept: '.pdf' },
+                  { label: 'Government Recognition Letter', hint: 'PDF up to 10MB', accept: '.pdf' },
+                  { label: 'PAN Card', hint: 'PDF, JPG up to 5MB', accept: '.pdf,.jpg,.jpeg,.png' },
+                  { label: 'GST Certificate (Optional)', hint: 'PDF up to 5MB', accept: '.pdf' },
+                ].map((doc) => {
+                  const existingFile = verificationFiles.find(f => f.label === doc.label);
+                  return (
                   <div key={doc.label}>
                     <Label>{doc.label}</Label>
-                    <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-5 text-center transition-colors hover:border-primary/40">
+                    <input
+                      type="file"
+                      id={`upload-${doc.label}`}
+                      className="hidden"
+                      accept={doc.accept}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const newFiles = verificationFiles.filter(f => f.label !== doc.label);
+                          newFiles.push({ file: e.target.files[0], label: doc.label });
+                          setVerificationFiles(newFiles);
+                        }
+                      }}
+                    />
+                    <div 
+                      onClick={() => document.getElementById(`upload-${doc.label}`)?.click()}
+                      className={cn(
+                        "mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-5 text-center transition-colors",
+                        existingFile ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                      )}
+                    >
                       <div>
-                        <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
-                        <p className="mt-1.5 text-xs text-muted-foreground">Click to upload</p>
-                        <p className="text-[10px] text-muted-foreground/70">{doc.hint}</p>
+                        <Upload className={cn("mx-auto h-6 w-6", existingFile ? "text-primary" : "text-muted-foreground")} />
+                        <p className="mt-1.5 text-xs font-medium">
+                          {existingFile ? existingFile.file.name : 'Click to upload'}
+                        </p>
+                        {!existingFile && <p className="text-[10px] text-muted-foreground/70">{doc.hint}</p>}
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
 
@@ -445,7 +495,7 @@ export default function VerifierRegisterForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Country</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="India">India</SelectItem>

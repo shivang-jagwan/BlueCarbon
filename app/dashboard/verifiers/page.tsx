@@ -9,20 +9,28 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Search,
-  Star,
   ShieldCheck,
-  Award,
-  Users,
   MapPin,
   Clock,
   Building2,
+  Globe,
+  Wallet,
+  Calendar,
+  Languages,
 } from 'lucide-react';
 import type { Profile } from '@/lib/types';
+import { RequestVerificationModal } from '@/components/shared/RequestVerificationModal';
+import { RequestMonitoringModal } from '@/components/shared/RequestMonitoringModal';
+import { useAuth } from '@/components/providers/auth-provider';
+import Link from 'next/link';
 
 export default function VerifiersPage() {
+  const { profile } = useAuth();
   const [verifiers, setVerifiers] = React.useState<Profile[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [selectedVerifier, setSelectedVerifier] = React.useState<{id: string, name: string} | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -111,25 +119,83 @@ export default function VerifiersPage() {
                   <p className="mt-3 text-sm text-muted-foreground line-clamp-2">{verifier.bio}</p>
                 )}
 
-                <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {verifier.country || '—'}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Star className="h-3 w-3 text-warning" />
-                    New
-                  </span>
+                <div className="mt-4 space-y-2 border-t pt-4 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Location</span>
+                    <span className="font-medium text-foreground">{verifier.country || 'Global'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Type</span>
+                    <span className="font-medium text-foreground capitalize">{verifier.organization_type || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Experience</span>
+                    <span className="font-medium text-foreground">{verifier.experience || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Starting Charges</span>
+                    <span className="font-medium text-foreground">
+                      {verifier.pricing_info ? `$${(verifier.pricing_info as any).starting_price || '500'}` : 'Contact for pricing'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><Languages className="h-3.5 w-3.5" /> Languages</span>
+                    <span className="font-medium text-foreground truncate max-w-[120px]">
+                      {verifier.languages_spoken ? verifier.languages_spoken.join(', ') : 'Not specified'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Response Time</span>
+                    <span className="font-medium text-foreground">{verifier.average_response_time || '< 24 hours'}</span>
+                  </div>
+                  {verifier.website && (
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> Website</span>
+                      <a href={verifier.website} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline truncate max-w-[120px]">
+                        {(() => { try { return new URL(verifier.website).hostname; } catch { return verifier.website; } })()}
+                      </a>
+                    </div>
+                  )}
                 </div>
 
-                <Button variant="outline" size="sm" className="mt-4 w-full">
-                  Request Verification
-                </Button>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/dashboard/verifiers/${verifier.id}`}>
+                      View Full Profile
+                    </Link>
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={() => {
+                      setSelectedVerifier({ id: verifier.id, name: verifier.full_name || verifier.organization || 'Verifier' });
+                      setModalOpen(true);
+                    }}
+                  >
+                    {profile?.role === 'sustainability_partner' ? 'Request Project Monitoring' : 'Request Verification'}
+                  </Button>
+                </div>
               </Card>
             );
           })}
         </div>
       )}
+
+      {selectedVerifier && profile?.role === 'sustainability_partner' ? (
+        <RequestMonitoringModal
+          verifierId={selectedVerifier.id}
+          verifierName={selectedVerifier.name}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      ) : selectedVerifier ? (
+        <RequestVerificationModal
+          verifierId={selectedVerifier.id}
+          verifierName={selectedVerifier.name}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

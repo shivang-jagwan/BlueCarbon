@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
 import type { AppRole } from '@/lib/types';
+import { uploadFile } from '@/services/storage';
 
 const schema = z.object({
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -105,6 +106,8 @@ export default function RegisterForm() {
   const role = (searchParams.get('role') as AppRole) || 'project_owner';
   const [step, setStep] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
+  const [aadhaarFile, setAadhaarFile] = React.useState<File | null>(null);
+  const [passportFile, setPassportFile] = React.useState<File | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -181,7 +184,6 @@ export default function RegisterForm() {
           email: values.email,
           full_name: values.full_name,
           role: role,
-          approval_status: 'approved',
           mobile_number: values.mobile_number,
           aadhaar_number: values.aadhaar_number,
           pan_number: values.pan_number || null,
@@ -203,13 +205,28 @@ export default function RegisterForm() {
         });
 
         if (profileError) {
-          console.error('Profile save error:', profileError);
+          // Profile save may fail if trigger already created it — non-critical
         }
 
         await supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
         });
+
+        // Upload KYC documents if provided
+        try {
+          if (aadhaarFile) {
+            await uploadFile(aadhaarFile, 'profile-documents', 'aadhaar');
+          }
+          if (passportFile) {
+            await uploadFile(passportFile, 'profile-documents', 'passport_photo');
+          }
+        } catch (uploadErr) {
+          // KYC upload failure is non-blocking — account is created
+          // But warn the user so they can re-upload from their profile
+          console.error('KYC upload error:', uploadErr);
+          toast.warning('Account created, but document upload failed. You can re-upload from your profile page.');
+        }
       }
 
       toast.success('Account created! Welcome to CarbonRush AI.');
@@ -393,7 +410,7 @@ export default function RegisterForm() {
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
                   <p className="text-sm text-muted-foreground">
                     Identity verification (KYC) is required for all project owners
-                    to ensure platform integrity and enable funding payments.
+                    to ensure platform integrity and enable support payments.
                   </p>
                 </div>
                 <FormField
@@ -425,25 +442,59 @@ export default function RegisterForm() {
                 <div className="space-y-3">
                   <div>
                     <Label>Aadhaar Upload</Label>
-                    <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40">
+                    <input
+                      type="file"
+                      id="aadhaar-upload"
+                      className="hidden"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setAadhaarFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <div 
+                      onClick={() => document.getElementById('aadhaar-upload')?.click()}
+                      className={cn(
+                        "mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40",
+                        aadhaarFile && "border-primary bg-primary/5"
+                      )}
+                    >
                       <div>
-                        <ShieldCheck className="mx-auto h-8 w-8 text-muted-foreground" />
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Click to upload or drag and drop
+                        <ShieldCheck className={cn("mx-auto h-8 w-8", aadhaarFile ? "text-primary" : "text-muted-foreground")} />
+                        <p className="mt-2 text-sm font-medium">
+                          {aadhaarFile ? aadhaarFile.name : 'Click to upload'}
                         </p>
-                        <p className="text-[10px] text-muted-foreground/70">PDF, JPG, PNG up to 5MB</p>
+                        {!aadhaarFile && <p className="text-[10px] text-muted-foreground/70">PDF, JPG, PNG up to 5MB</p>}
                       </div>
                     </div>
                   </div>
                   <div>
                     <Label>Passport Photo</Label>
-                    <div className="mt-1.5 flex items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40">
+                    <input
+                      type="file"
+                      id="passport-upload"
+                      className="hidden"
+                      accept=".jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setPassportFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <div 
+                      onClick={() => document.getElementById('passport-upload')?.click()}
+                      className={cn(
+                        "mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40",
+                        passportFile && "border-primary bg-primary/5"
+                      )}
+                    >
                       <div>
-                        <User className="mx-auto h-8 w-8 text-muted-foreground" />
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Click to upload or drag and drop
+                        <User className={cn("mx-auto h-8 w-8", passportFile ? "text-primary" : "text-muted-foreground")} />
+                        <p className="mt-2 text-sm font-medium">
+                          {passportFile ? passportFile.name : 'Click to upload'}
                         </p>
-                        <p className="text-[10px] text-muted-foreground/70">JPG, PNG up to 2MB</p>
+                        {!passportFile && <p className="text-[10px] text-muted-foreground/70">JPG, PNG up to 2MB</p>}
                       </div>
                     </div>
                   </div>
@@ -460,7 +511,7 @@ export default function RegisterForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Country</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select country" />
@@ -543,7 +594,7 @@ export default function RegisterForm() {
               <div className="space-y-4 animate-fade-in">
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
                   <p className="text-sm text-muted-foreground">
-                    Bank details are used for receiving funding payments from
+                    Bank details are used for receiving support payments from
                     sustainability partners and carbon credit sales.
                   </p>
                 </div>
@@ -641,7 +692,7 @@ export default function RegisterForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Experience</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select experience" />
@@ -664,7 +715,7 @@ export default function RegisterForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Primary Restoration Activity</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select activity" />

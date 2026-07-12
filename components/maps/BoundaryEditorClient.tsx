@@ -40,11 +40,13 @@ export function BoundaryEditor({ geojson, onChange, height = '500px' }: Boundary
           
           // Fit bounds
           try {
-             const bbox = turf.bbox(geojson as any);
+             const bbox = turf.bbox(geojson as turf.AllGeoJSON);
              if (mapRef.current) {
                 mapRef.current.fitBounds([bbox[0], bbox[1], bbox[2], bbox[3]], { padding: 40, duration: 1000 });
              }
-          } catch(e) {}
+           } catch(e) {
+              // Malformed geometry — skip fit bounds
+           }
         }
       }
     }

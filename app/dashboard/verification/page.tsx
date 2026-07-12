@@ -61,7 +61,7 @@ export default function VerificationCenterPage() {
   const handleStatusUpdate = async (requestId: string, status: string) => {
     try {
       const { error } = await supabase
-        .from('verification_requests')
+        .from('verification_service_requests')
         .update({ status })
         .eq('id', requestId);
       if (error) throw error;
@@ -176,10 +176,13 @@ export default function VerificationCenterPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h3 className="font-semibold leading-tight">
-                          {VERIFICATION_REQUEST_TYPE_LABELS[req.request_type]}
+                          {(req as any).projects?.name || 'Project Verification'}
                         </h3>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {VERIFICATION_REQUEST_TYPE_LABELS[req.request_type]} Request
+                        </p>
                         {req.description && (
-                          <p className="mt-0.5 text-sm text-muted-foreground line-clamp-1">{req.description}</p>
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{req.description}</p>
                         )}
                       </div>
                       <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap', verificationStatusColor(req.status))}>

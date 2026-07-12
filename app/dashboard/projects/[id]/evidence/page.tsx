@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { useProjectDocuments } from '@/hooks/use-projects';
+import { useProjectFiles } from '@/hooks/use-projects';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ import {
   Download,
   Trash2,
 } from 'lucide-react';
+import { FileUpload } from '@/components/shared/FileUpload';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = [
@@ -49,59 +50,16 @@ function formatSize(bytes: number | null) {
 export default function EvidencePage() {
   const params = useParams();
   const projectId = params.id as string;
-  const { documents, loading, refetch } = useProjectDocuments(projectId);
+  const { files: documents, loading, refetch } = useProjectFiles(projectId);
   const { user } = useAuth();
-  const [uploading, setUploading] = React.useState(false);
   const [selectedCategory, setSelectedCategory] = React.useState('ground_image');
-  const fileRef = React.useRef<HTMLInputElement>(null);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
 
-    setUploading(true);
-    try {
-      const filePath = `${projectId}/${selectedCategory}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('project-evidence')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { error: docError } = await supabase.from('project_documents').insert({
-        project_id: projectId,
-        uploaded_by: user.id,
-        name: file.name,
-        file_path: filePath,
-        file_size: file.size,
-        mime_type: file.type,
-        category: selectedCategory,
-      });
-
-      if (docError) throw docError;
-
-      await supabase.from('project_activity').insert({
-        project_id: projectId,
-        actor_id: user.id,
-        event_type: 'evidence_uploaded',
-        title: 'Evidence Uploaded',
-        description: `${file.name} uploaded to ${CATEGORIES.find((c) => c.id === selectedCategory)?.label}`,
-      });
-
-      toast.success('Evidence uploaded successfully');
-      refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
 
   const handleDelete = async (docId: string, filePath: string) => {
     try {
-      await supabase.storage.from('project-evidence').remove([filePath]);
-      await supabase.from('project_documents').delete().eq('id', docId);
+      await supabase.storage.from('evidence').remove([filePath]);
+      await supabase.from('project_files').delete().eq('id', docId);
       toast.success('Document deleted');
       refetch();
     } catch (err) {
@@ -142,34 +100,14 @@ export default function EvidencePage() {
             );
           })}
         </div>
-        <div
-          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/30"
-          onClick={() => fileRef.current?.click()}
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            onChange={handleUpload}
-            accept="image/*,video/*,.pdf,.csv,.txt"
-          />
-          {uploading ? (
-            <>
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="mt-3 text-sm text-muted-foreground">Uploading...</p>
-            </>
-          ) : (
-            <>
-              <Upload className="h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 text-sm font-medium">
-                Upload to {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Click to browse or drag and drop
-              </p>
-            </>
-          )}
-        </div>
+        <FileUpload
+          bucket="evidence"
+          projectId={projectId}
+          category={selectedCategory}
+          onUploadSuccess={() => refetch()}
+          label={`Upload to ${CATEGORIES.find((c) => c.id === selectedCategory)?.label}`}
+          description="Click to browse or drag and drop (Max 50MB)"
+        />
       </Card>
 
       {/* Documents List */}
@@ -198,7 +136,7 @@ export default function EvidencePage() {
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-medium">{doc.name}</p>
+                  <p className="truncate text-sm font-medium">{doc.file_name}</p>
                   <div className="mt-0.5 flex items-center gap-2">
                     {cat && <Badge variant="secondary" className="text-xs">{cat.label}</Badge>}
                     <span className="text-xs text-muted-foreground">{formatSize(doc.file_size)}</span>
@@ -208,14 +146,20 @@ export default function EvidencePage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={async () => {
+                    try {
+                      const { data } = await supabase.storage.from('evidence').createSignedUrl(doc.storage_path, 60);
+                      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                      else toast.error('Could not generate download link');
+                    } catch { toast.error('Download failed'); }
+                  }}>
                     <Download className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(doc.id, doc.file_path)}
+                    onClick={() => handleDelete(doc.id, doc.storage_path)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

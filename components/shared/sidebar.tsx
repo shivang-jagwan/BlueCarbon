@@ -10,7 +10,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Menu, LogOut, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
@@ -138,6 +138,7 @@ export function MobileSidebar() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-72 p-0">
+        <SheetTitle className="sr-only">Navigation</SheetTitle>
         <Sidebar onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
