@@ -25,7 +25,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Handle nested standalone output due to workspace root detection
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/Blue-Carbon-MarketPlace-main/* ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs

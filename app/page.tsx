@@ -5,18 +5,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import mapImage from '@/assests/image1.png';
 import heroImage from '@/assests/image2.png';
-import { motion, useInView, useScroll, useTransform } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Logo } from '@/components/shared/logo';
 import {
   ArrowRight,
   Menu,
@@ -24,21 +17,12 @@ import {
   Shield,
   FileText,
   Map,
-  BarChart3,
   Users,
-  Bell,
   CheckCircle2,
-  Building2,
   Fingerprint,
-  Check,
   Play,
-  Satellite,
-  Camera,
-  Brain,
-  Clock,
   HeartHandshake,
   Handshake,
-  Activity,
   Eye,
   TrendingUp,
   MapPin,
@@ -46,6 +30,10 @@ import {
   Award,
   Lock,
   TreePine,
+  Building2,
+  Brain,
+  Satellite,
+  BarChart3,
 } from 'lucide-react';
 
 const fadeUp = {
@@ -111,6 +99,24 @@ export default function LandingPage() {
     { label: 'Features', href: '#features' },
     { label: 'About', href: '#why' },
     { label: 'Contact', href: '#contact' },
+  ];
+
+  const workflowSteps = [
+    { icon: FileText, title: 'Register Project', desc: 'Create account and register your blue carbon project.' },
+    { icon: Shield, title: 'Verification Service', desc: 'Request verification from certified organizations.' },
+    { icon: CheckCircle2, title: 'Project Published', desc: 'Approved projects become discoverable by partners.' },
+    { icon: HeartHandshake, title: 'Project Support', desc: 'Sustainability partners establish monitoring partnerships.' },
+    { icon: Handshake, title: 'Monitoring Partnership', desc: 'Project owner and monitoring org finalize agreement.' },
+    { icon: Fingerprint, title: 'Carbon Passport', desc: 'Verified carbon credits issued as immutable passports.' },
+  ];
+
+  const features = [
+    { icon: Map, title: 'GIS Mapping', desc: 'Draw project boundaries with interactive polygon tools.' },
+    { icon: Satellite, title: 'Satellite Monitoring', desc: 'Track restoration progress with satellite imagery.' },
+    { icon: Shield, title: 'Verification Workflow', desc: 'Streamlined approval with certified organizations.' },
+    { icon: Fingerprint, title: 'Carbon Passport', desc: 'Immutable digital certificates for sequestered carbon.' },
+    { icon: FileText, title: 'Monitoring Reports', desc: 'Automated compliance-ready PDF reports.' },
+    { icon: Brain, title: 'AI Insights', desc: 'Intelligent analysis of monitoring data and trends.' },
   ];
 
   return (
@@ -196,9 +202,8 @@ export default function LandingPage() {
       </nav>
 
       <main>
-        {/* ─── HERO SECTION ─── */}
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background" />
+        {/* ─── 1. HERO ─── */}
+        <section className="relative overflow-hidden bg-white">
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4" />
 
           <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-24 lg:pt-24 lg:pb-32">
@@ -231,7 +236,7 @@ export default function LandingPage() {
                       Explore Projects <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="rounded-xl px-6 h-11 text-sm font-medium border-border hover:bg-background text-black">
+                  <Button asChild variant="outline" className="rounded-xl px-6 h-11 text-sm font-medium border-primary/30 hover:bg-primary/5 text-primary">
                     <Link href="/register">
                       Request Demo
                     </Link>
@@ -280,7 +285,6 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                {/* Floating stats card */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -306,7 +310,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── TRUSTED BY ─── */}
+        {/* ─── 2. TRUSTED BY ─── */}
         <section className="py-14 border-y border-border bg-white">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-8">
@@ -322,8 +326,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── PLATFORM OVERVIEW (3 Roles) ─── */}
-        <section id="platform" className="py-24 bg-background">
+        {/* ─── 3. PLATFORM OVERVIEW (3 Roles) ─── */}
+        <section id="platform" className="py-28 bg-white">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Platform</Badge>
@@ -340,33 +344,27 @@ export default function LandingPage() {
                 {
                   icon: TreePine,
                   title: 'Project Owners',
-                  desc: 'Register projects, upload monitoring evidence, track health scores, and manage verification workflows — all in one place.',
+                  desc: 'Register projects, upload monitoring evidence, track health scores, and manage verification workflows.',
                   cta: 'Start a Project',
-                  color: '#2E7D32',
-                  bg: 'bg-primary/5',
                 },
                 {
                   icon: Shield,
                   title: 'Verification & Monitoring',
-                  desc: 'Review evidence systematically, issue approvals, conduct monthly monitoring, and generate immutable Carbon Passports.',
+                  desc: 'Review evidence systematically, issue approvals, conduct monitoring, and generate Carbon Passports.',
                   cta: 'Join as Verifier',
-                  color: '#43A047',
-                  bg: 'bg-accent/5',
                 },
                 {
                   icon: HeartHandshake,
                   title: 'Sustainability Partners',
-                  desc: 'Discover verified projects, establish monitoring partnerships, track impact metrics, and download ESG-ready reports.',
+                  desc: 'Discover verified projects, establish monitoring partnerships, track impact, and download ESG reports.',
                   cta: 'Explore Projects',
-                  color: '#2E7D32',
-                  bg: 'bg-primary/5',
                 },
               ].map((role) => (
                 <motion.div key={role.title} variants={staggerItem}>
                   <Card className="border-border bg-white hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 h-full group">
                     <CardContent className="p-7">
-                      <div className={`w-12 h-12 rounded-xl ${role.bg} flex items-center justify-center mb-5`}>
-                        <role.icon className="h-6 w-6" style={{ color: role.color }} />
+                      <div className="w-12 h-12 rounded-xl bg-primary/8 flex items-center justify-center mb-5">
+                        <role.icon className="h-6 w-6 text-primary" />
                       </div>
                       <h3 className="font-display text-lg font-semibold mb-2">{role.title}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed mb-5">{role.desc}</p>
@@ -381,8 +379,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── HOW IT WORKS (7 Steps) ─── */}
-        <section id="how-it-works" className="py-24 bg-white">
+        {/* ─── 4. HOW CARBONRUSH WORKS (Horizontal Timeline) ─── */}
+        <section id="how-it-works" className="py-28 bg-[#F8FBF8]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">How it Works</Badge>
@@ -390,87 +388,46 @@ export default function LandingPage() {
                 From registration to verified impact
               </h2>
               <p className="text-muted-foreground text-lg">
-                A seamless 7-step journey powering transparent blue carbon restoration.
+                A seamless journey powering transparent blue carbon restoration.
               </p>
             </motion.div>
 
-            <div className="relative max-w-3xl mx-auto">
-              <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-primary/20 via-primary/10 to-transparent hidden sm:block" />
-
-              <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="space-y-0">
-                {[
-                  { icon: Users, title: 'Register Project', desc: 'Create your account and register your blue carbon project with basic details.' },
-                  { icon: FileText, title: 'Verification Service Request', desc: 'Request verification from certified monitoring organizations.' },
-                  { icon: CheckCircle2, title: 'Project Published', desc: 'Once approved, your project becomes discoverable by sustainability partners.' },
-                  { icon: HeartHandshake, title: 'Company Supports Project', desc: 'Sustainability partners establish monitoring partnerships with project owners.' },
-                  { icon: Handshake, title: 'Monitoring Partnership', desc: 'Project owner and monitoring org finalize the partnership agreement.' },
-                  { icon: Calendar, title: 'Monthly Monitoring', desc: 'Regular evidence uploads, health tracking, and progress reports.' },
-                  { icon: Fingerprint, title: 'Carbon Passport', desc: 'Verified carbon credits issued as immutable digital passports.' },
-                ].map((step, i) => (
-                  <motion.div key={i} variants={staggerItem} className="flex gap-4 sm:gap-6">
-                    <div className="relative flex-shrink-0">
-                      <div className="w-12 h-12 rounded-xl bg-primary/8 flex items-center justify-center relative z-10">
-                        <step.icon className="h-5 w-5 text-primary" />
-                      </div>
+            {/* Desktop: Horizontal Timeline */}
+            <motion.div {...fadeUp} className="hidden md:block relative max-w-5xl mx-auto">
+              <div className="absolute top-6 left-[8%] right-[8%] h-px bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20" />
+              <div className="grid grid-cols-6 gap-4">
+                {workflowSteps.map((step, i) => (
+                  <div key={i} className="flex flex-col items-center text-center relative z-10">
+                    <div className="w-12 h-12 rounded-full bg-white border-2 border-primary/20 flex items-center justify-center mb-4 shadow-sm">
+                      <step.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="pb-8 pt-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-primary">Step {i + 1}</span>
-                      </div>
-                      <h3 className="font-display text-base font-semibold mb-1">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            </div>
-          </div>
-        </section>
-
-        {/* ─── PLATFORM FEATURES (12-item grid) ─── */}
-        <section id="features" className="py-24 bg-background">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
-              <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Features</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                Everything you need
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                Enterprise-grade tools for managing blue carbon projects at scale.
-              </p>
-            </motion.div>
-
-            <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[
-                { icon: Map, title: 'GIS Mapping', desc: 'Draw project boundaries with interactive polygon tools.' },
-                { icon: Satellite, title: 'Satellite Monitoring', desc: 'Track restoration progress with satellite imagery.' },
-                { icon: Camera, title: 'Drone Support', desc: 'Upload drone-captured evidence for field verification.' },
-                { icon: Shield, title: 'Verification Workflow', desc: 'Streamlined approval process with certified organizations.' },
-                { icon: Fingerprint, title: 'Carbon Passport', desc: 'Immutable digital certificates for sequestered carbon.' },
-                { icon: FileText, title: 'Monthly Reports', desc: 'Automated compliance-ready PDF reports.' },
-                { icon: Brain, title: 'AI Insights', desc: 'Intelligent analysis of monitoring data and trends.' },
-                { icon: Clock, title: 'Project Timeline', desc: 'Chronological view of all project activities.' },
-                { icon: HeartHandshake, title: 'Partner Support', desc: 'Connect with sustainability partners directly.' },
-                { icon: Bell, title: 'Notifications', desc: 'Real-time updates on project changes and statuses.' },
-                { icon: Activity, title: 'Activity Feed', desc: 'Complete audit trail of platform actions.' },
-                { icon: BarChart3, title: 'Impact Analytics', desc: 'Visualize carbon capture and ecosystem health metrics.' },
-              ].map((feature) => (
-                <motion.div key={feature.title} variants={staggerItem}>
-                  <div className="bg-white rounded-xl border border-border p-5 hover:shadow-md hover:shadow-primary/5 hover:border-primary/20 transition-all duration-200 h-full">
-                    <div className="w-10 h-10 rounded-lg bg-primary/6 flex items-center justify-center mb-3">
-                      <feature.icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="font-display text-sm font-semibold mb-1">{feature.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{feature.desc}</p>
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step {i + 1}</p>
+                    <p className="text-sm font-semibold mb-1">{step.title}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{step.desc}</p>
                   </div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Mobile: Vertical Timeline */}
+            <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="md:hidden relative pl-10 space-y-8">
+              <div className="absolute top-0 bottom-0 left-4 w-px bg-primary/20" />
+              {workflowSteps.map((step, i) => (
+                <motion.div key={i} variants={staggerItem} className="relative">
+                  <div className="absolute -left-10 top-0 w-8 h-8 rounded-full bg-white border-2 border-primary/20 flex items-center justify-center shadow-sm">
+                    <step.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step {i + 1}</p>
+                  <p className="text-sm font-semibold mb-1">{step.title}</p>
+                  <p className="text-xs text-muted-foreground">{step.desc}</p>
                 </motion.div>
               ))}
             </motion.div>
           </div>
         </section>
 
-        {/* ─── INTERACTIVE PLATFORM PREVIEW ─── */}
-        <section className="py-24 bg-white">
+        {/* ─── 5. DASHBOARD PREVIEW ─── */}
+        <section id="features" className="py-28 bg-white">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-12">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Preview</Badge>
@@ -491,7 +448,6 @@ export default function LandingPage() {
                       { value: 'verifier', label: 'Verifier' },
                       { value: 'partner', label: 'Sustainability Partner' },
                       { value: 'admin', label: 'Admin' },
-                      { value: 'shared', label: 'Shared Workspace' },
                     ].map((tab) => (
                       <TabsTrigger key={tab.value} value={tab.value} className="rounded-lg px-4 py-2 text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-foreground">
                         {tab.label}
@@ -505,7 +461,6 @@ export default function LandingPage() {
                   { value: 'verifier', color: '#43A047', title: 'Verification Dashboard', desc: 'Review service requests, examine evidence, leave comments, and issue approvals.' },
                   { value: 'partner', color: '#2E7D32', title: 'Sustainability Partner Hub', desc: 'Discover projects, establish partnerships, monitor impact, and download ESG reports.' },
                   { value: 'admin', color: '#43A047', title: 'Admin Console', desc: 'Platform health monitoring, user management, verification queues, and activity logs.' },
-                  { value: 'shared', color: '#2E7D32', title: 'Shared Workspace', desc: 'Collaborative tabs for discussion, timeline, documents, reports, and monitoring data.' },
                 ].map((panel) => (
                   <TabsContent key={panel.value} value={panel.value} className="mt-0">
                     <div className="relative max-w-4xl mx-auto">
@@ -555,11 +510,82 @@ export default function LandingPage() {
                 ))}
               </Tabs>
             </motion.div>
+
+            {/* 6 Key Features */}
+            <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-16">
+              {features.map((feature) => (
+                <motion.div key={feature.title} variants={staggerItem}>
+                  <div className="bg-white rounded-xl border border-border p-5 hover:shadow-md hover:shadow-primary/5 hover:border-primary/20 transition-all duration-200 h-full">
+                    <div className="w-10 h-10 rounded-lg bg-primary/6 flex items-center justify-center mb-3">
+                      <feature.icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="font-display text-sm font-semibold mb-1">{feature.title}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{feature.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </section>
 
-        {/* ─── CARBON PASSPORT ─── */}
-        <section className="py-24 bg-background">
+        {/* ─── 6. GIS MONITORING ─── */}
+        <section className="py-28 bg-[#F8FBF8]">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <motion.div {...fadeUp} className="order-2 lg:order-1 relative">
+                <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-foreground/90">
+                  <div className="aspect-[4/3] relative">
+                    <Image
+                      src={mapImage}
+                      alt="Sundarbans Project Zone Map"
+                      fill
+                      className="object-cover"
+                      placeholder="blur"
+                    />
+                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md rounded-lg px-3 py-2 text-white text-xs font-medium flex items-center gap-2 border border-white/10 shadow-lg">
+                      <MapPin className="h-3.5 w-3.5" /> Sundarbans Project Zone
+                    </div>
+                    <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-md rounded-lg px-3 py-2 text-white text-xs border border-white/10 shadow-lg">
+                      <div className="flex items-center gap-1.5 mb-1"><div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" /> Healthy: 78%</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]" /> Monitoring: 22%</div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div {...fadeUp} className="order-1 lg:order-2">
+                <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Maps & Monitoring</Badge>
+                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+                  See restoration in real time
+                </h2>
+                <p className="text-muted-foreground text-lg leading-relaxed mb-8">
+                  Interactive GIS maps with satellite overlays and continuous health monitoring.
+                </p>
+                <div className="space-y-4">
+                  {[
+                    { icon: Map, title: 'Polygon Boundaries', desc: 'Draw and track project areas with precision GIS tools.' },
+                    { icon: TrendingUp, title: 'Health Score', desc: 'Real-time ecosystem health monitoring with AI analysis.' },
+                    { icon: Calendar, title: 'Monitoring Timeline', desc: 'Monthly evidence uploads and progress tracking.' },
+                    { icon: FileText, title: 'Automated Reports', desc: 'Compliance-ready PDFs generated from monitoring data.' },
+                  ].map((item) => (
+                    <div key={item.title} className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── 7. CARBON PASSPORT ─── */}
+        <section className="py-28 bg-white">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <motion.div {...fadeUp}>
@@ -570,14 +596,14 @@ export default function LandingPage() {
                 <p className="text-muted-foreground text-lg leading-relaxed mb-8">
                   Every verified ton of carbon sequestered receives a tamper-proof digital passport — transparent, auditable, and globally recognized.
                 </p>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   {[
-                    { icon: Lock, title: 'Immutable', desc: 'Cannot be altered once issued' },
                     { icon: Shield, title: 'Verified', desc: 'Backed by certified auditors' },
+                    { icon: Lock, title: 'Immutable', desc: 'Cannot be altered once issued' },
                     { icon: Eye, title: 'Transparent', desc: 'Publicly verifiable on the platform' },
-                    { icon: Award, title: 'Trusted', desc: 'Recognized by global standards' },
+                    { icon: Award, title: 'Globally Trusted', desc: 'Recognized by global standards' },
                   ].map((item) => (
-                    <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-border">
+                    <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl bg-background border border-border">
                       <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
                         <item.icon className="h-4 w-4 text-primary" />
                       </div>
@@ -627,238 +653,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── MAPS & MONITORING ─── */}
-        <section className="py-24 bg-white">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <motion.div {...fadeUp} className="order-2 lg:order-1 relative">
-                <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-foreground/90">
-                  <div className="aspect-[4/3] relative">
-                    <Image
-                      src={mapImage}
-                      alt="Sundarbans Project Zone Map"
-                      fill
-                      className="object-cover"
-                      placeholder="blur"
-                    />
-                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md rounded-lg px-3 py-2 text-white text-xs font-medium flex items-center gap-2 border border-white/10 shadow-lg">
-                      <MapPin className="h-3.5 w-3.5" /> Sundarbans Project Zone
-                    </div>
-                    <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-md rounded-lg px-3 py-2 text-white text-xs border border-white/10 shadow-lg">
-                      <div className="flex items-center gap-1.5 mb-1"><div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" /> Healthy: 78%</div>
-                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]" /> Monitoring: 22%</div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div {...fadeUp} className="order-1 lg:order-2">
-                <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Maps & Monitoring</Badge>
-                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                  See restoration in real time
-                </h2>
-                <p className="text-muted-foreground text-lg leading-relaxed mb-8">
-                  Interactive GIS maps with satellite overlays, polygon boundaries, and continuous health monitoring.
-                </p>
-                <div className="space-y-4">
-                  {[
-                    { icon: Map, title: 'Polygon Boundaries', desc: 'Draw and track project areas with precision GIS tools.' },
-                    { icon: TrendingUp, title: 'Health Score', desc: 'Real-time ecosystem health monitoring with AI analysis.' },
-                    { icon: Calendar, title: 'Monitoring Timeline', desc: 'Monthly evidence uploads and progress tracking.' },
-                    { icon: FileText, title: 'Automated Reports', desc: 'Compliance-ready PDFs generated from monitoring data.' },
-                  ].map((item) => (
-                    <div key={item.title} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <item.icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
-
-        {/* ─── WHY CARBONRUSH AI (Comparison) ─── */}
-        <section id="why" className="py-24 bg-background">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
-              <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Why CarbonRush AI</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                A new standard for MRV
-              </h2>
-            </motion.div>
-
-            <motion.div {...fadeUp}>
-              <div className="rounded-2xl border border-border overflow-hidden bg-white shadow-sm">
-                <div className="grid grid-cols-3 bg-background border-b border-border px-6 py-4 text-sm font-semibold">
-                  <div className="hidden md:block">Capability</div>
-                  <div className="text-muted-foreground">Traditional</div>
-                  <div className="text-primary">CarbonRush AI</div>
-                </div>
-                {[
-                  { label: 'Documentation', old: 'Manual & paper-based', new: 'AI-assisted & digital' },
-                  { label: 'Communication', old: 'Scattered emails', new: 'Centralized workspace' },
-                  { label: 'Transparency', old: 'Opaque process', new: 'Shared activity timeline' },
-                  { label: 'Reporting', old: 'Fragmented files', new: 'Unified dashboards' },
-                  { label: 'Verification Speed', old: 'Months', new: 'Weeks' },
-                  { label: 'Carbon Tracking', old: 'Spreadsheet-based', new: 'Immutable passports' },
-                  { label: 'GIS Mapping', old: 'External tools', new: 'Integrated polygon editor' },
-                ].map((row, i) => (
-                  <div key={i} className="grid grid-cols-3 border-b last:border-0 border-border px-6 py-4 text-sm items-center">
-                    <div className="hidden md:block font-medium">{row.label}</div>
-                    <div className="text-muted-foreground text-xs sm:text-sm">{row.old}</div>
-                    <div className="font-medium text-foreground flex items-center gap-2 text-xs sm:text-sm">
-                      <Check className="w-4 h-4 text-success flex-shrink-0" /> {row.new}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ─── IMPACT STATISTICS ─── */}
-        <section className="py-20 bg-primary text-white">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <motion.div {...fadeUp} className="text-center mb-12">
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-3">
-                Measured global impact
-              </h2>
-              <p className="text-white/70 text-lg">
-                Real numbers from real restoration projects.
-              </p>
-            </motion.div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
-              {[
-                { value: 500, suffix: '+', label: 'Projects' },
-                { value: 120, suffix: '+', label: 'Organizations' },
-                { value: 45, suffix: '', label: 'Countries' },
-                { value: 8500, suffix: 'K+', label: 'Carbon (tCO₂e)' },
-                { value: 2400, suffix: 'K+', label: 'Hectares' },
-                { value: 320, suffix: '+', label: 'Reports' },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <p className="font-display text-3xl sm:text-4xl font-bold mb-1">
-                    <CountUp target={stat.value} suffix={stat.suffix} />
-                  </p>
-                  <p className="text-sm text-white/70">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ─── TESTIMONIALS ─── */}
-        <section className="py-24 bg-white">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
-              <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Testimonials</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
-                Trusted by the community
-              </h2>
-            </motion.div>
-
-            <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                {
-                  quote: 'CarbonRush has transformed how we document our mangrove restoration. What used to take weeks of formatting now happens automatically.',
-                  name: 'Sarah Jenkins',
-                  role: 'CSR Head, OceanSave NGO',
-                  avatar: 'SJ',
-                  avatarBg: 'bg-primary/10 text-primary',
-                },
-                {
-                  quote: 'The centralized workspace makes audits significantly faster. All evidence is geo-tagged, timestamped, and organized.',
-                  name: 'Dr. Michael Chen',
-                  role: 'Government Verification Officer',
-                  avatar: 'MC',
-                  avatarBg: 'bg-primary/10 text-primary',
-                },
-                {
-                  quote: 'We need absolute transparency for ESG reporting. CarbonRush provides the immutable proof we require.',
-                  name: 'Elena Rodriguez',
-                  role: 'Sustainability Director, GlobalTech',
-                  avatar: 'ER',
-                  avatarBg: 'bg-primary/10 text-primary',
-                },
-                {
-                  quote: 'The GIS integration and satellite monitoring give us unprecedented visibility into ecosystem health.',
-                  name: 'Prof. Amara Osei',
-                  role: 'Research Scientist, marine Institute',
-                  avatar: 'AO',
-                  avatarBg: 'bg-primary/10 text-primary',
-                },
-              ].map((t) => (
-                <motion.div key={t.name} variants={staggerItem}>
-                  <Card className="border-border bg-white h-full">
-                    <CardContent className="p-6">
-                      <div className="flex gap-0.5 text-primary mb-3">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <svg key={i} className="h-3.5 w-3.5 fill-current" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${t.avatarBg}`}>
-                          {t.avatar}
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold">{t.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{t.role}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ─── FAQ ─── */}
-        <section className="py-24 bg-background">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-            <motion.div {...fadeUp} className="text-center mb-12">
-              <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">FAQ</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
-                Frequently asked questions
-              </h2>
-            </motion.div>
-
-            <motion.div {...fadeUp}>
-              <Accordion type="single" collapsible className="space-y-0">
-                {[
-                  { q: 'What is Blue Carbon?', a: 'Blue carbon refers to carbon captured by ocean and coastal ecosystems — mangroves, salt marshes, and seagrasses. These ecosystems are among the most efficient carbon sinks on Earth, storing up to 10x more carbon per hectare than terrestrial forests.' },
-                  { q: 'How does the verification process work?', a: 'Project owners upload evidence (photos, GIS data, documents). Certified verifiers review this data within the platform, leave comments, request clarifications, and ultimately issue approvals that generate immutable Carbon Passports.' },
-                  { q: 'Who can register on CarbonRush AI?', a: 'We welcome project developers (NGOs, communities), accredited verification bodies, and corporate sustainability partners looking to discover, support, and monitor verified restoration efforts.' },
-                  { q: 'Is GIS mapping supported?', a: 'Yes. The platform includes integrated map tools for drawing project boundaries, tracking geospatial coordinates, overlaying satellite imagery, and monitoring ecosystem health scores over time.' },
-                  { q: 'Can companies directly support projects?', a: 'Absolutely. Sustainability Partners can discover verified projects, establish monitoring partnerships, track ongoing impact, and download ESG-ready reports — all within the platform.' },
-                  { q: 'What is a Carbon Passport?', a: 'A Carbon Passport is an immutable digital certificate issued after verification. It records the verified carbon sequestration, project details, verifier information, and validity period — all publicly auditable.' },
-                ].map((item, i) => (
-                  <AccordionItem key={i} value={`item-${i}`} className="border-border">
-                    <AccordionTrigger className="text-left text-sm font-semibold text-foreground hover:no-underline hover:text-primary">
-                      {item.q}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-sm text-muted-foreground leading-relaxed">
-                      {item.a}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ─── CTA ─── */}
-        <section id="contact" className="py-24 bg-white">
+        {/* ─── 8. FINAL CTA ─── */}
+        <section id="contact" className="py-28 bg-white">
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp}>
               <div className="rounded-3xl bg-gradient-to-br from-primary to-primary/80 p-12 sm:p-16 text-center text-white relative overflow-hidden">
@@ -894,7 +690,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* ─── FOOTER ─── */}
+      {/* ─── 9. FOOTER ─── */}
       <footer className="bg-foreground text-muted-foreground pt-16 pb-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
@@ -952,7 +748,7 @@ export default function LandingPage() {
           </div>
 
           <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground">
-            <p suppressHydrationWarning>© {new Date().getFullYear()} CarbonRush AI. All rights reserved.</p>
+            <p suppressHydrationWarning>&copy; {new Date().getFullYear()} CarbonRush AI. All rights reserved.</p>
             <div className="flex gap-6">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
               <a href="#" className="hover:text-white transition-colors">Terms</a>
