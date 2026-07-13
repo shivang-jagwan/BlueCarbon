@@ -509,7 +509,123 @@ BEGIN
 END $$;
 
 -- ============================================================
--- 11. saved_projects (create from scratch if missing)
+-- 11. FIX is_project_verifier_via_request() function
+-- The DB may have the OLD version referencing verification_requests
+-- (pre-rename table). Recreate with correct table name.
+-- ============================================================
+CREATE OR REPLACE FUNCTION is_project_verifier_via_request(p_id uuid, u_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM verification_service_requests vr
+    WHERE vr.project_id = p_id
+      AND vr.verifier_id = u_id
+      AND vr.status IN ('pending', 'in_review', 'changes_requested')
+  );
+$$;
+
+-- ============================================================
+-- 12. FIX is_project_funder() function
+-- May reference old funding_contributions table.
+-- Recreate with correct table name.
+-- ============================================================
+CREATE OR REPLACE FUNCTION is_project_funder(p_id uuid, u_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM project_support ps
+    WHERE ps.project_id = p_id
+      AND ps.partner_id = u_id
+  );
+$$;
+
+-- ============================================================
+-- 13. Ensure is_project_monitoring_partner() exists
+-- ============================================================
+CREATE OR REPLACE FUNCTION is_project_monitoring_partner(p_id uuid, u_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM project_partnerships pp
+    WHERE pp.project_id = p_id
+      AND pp.verifier_id = u_id
+      AND pp.status = 'active'
+  );
+$$;
+
+-- ============================================================
+-- 14. Ensure is_project_owner_via_partnership() exists
+-- ============================================================
+CREATE OR REPLACE FUNCTION is_project_owner_via_partnership(p_id uuid, u_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM project_partnerships pp
+    WHERE pp.project_id = p_id
+      AND pp.owner_id = u_id
+      AND pp.status = 'active'
+  );
+$$;
+
+-- ============================================================
+-- 15. Ensure updated_at trigger on verification_service_requests
+-- ============================================================
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'verification_service_requests'
+  ) THEN
+    DROP TRIGGER IF EXISTS verif_req_updated_at ON verification_service_requests;
+    CREATE TRIGGER verif_req_updated_at
+      BEFORE UPDATE ON verification_service_requests
+      FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+  END IF;
+END $$;
+
+-- ============================================================
+-- 16. Ensure updated_at trigger on verification_service_decisions
+-- ============================================================
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'verification_service_decisions'
+  ) THEN
+    DROP TRIGGER IF EXISTS verif_dec_updated_at ON verification_service_decisions;
+    CREATE TRIGGER verif_dec_updated_at
+      BEFORE UPDATE ON verification_service_decisions
+      FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+  END IF;
+END $$;
+
+-- ============================================================
+-- 17. Ensure updated_at trigger on project_support
+-- ============================================================
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'project_support'
+  ) THEN
+    DROP TRIGGER IF EXISTS support_updated_at ON project_support;
+    CREATE TRIGGER support_updated_at
+      BEFORE UPDATE ON project_support
+      FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+  END IF;
+END $$;
+
+-- ============================================================
+-- 18. saved_projects (create from scratch if missing)
 -- ============================================================
 DO $$
 BEGIN
