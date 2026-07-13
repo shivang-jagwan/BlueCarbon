@@ -299,6 +299,61 @@ BEGIN
 END $$;
 
 -- ============================================================
+-- 7b. Ensure all projects columns exist (from later migrations)
+-- ============================================================
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN objectives text;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN expected_duration_months integer;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN ownership_type text
+    CHECK (ownership_type IN ('private','government','community','leased'));
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN survey_number text;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN health_score integer DEFAULT 0;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN center_lat double precision;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN center_lng double precision;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE projects ADD COLUMN bounding_box jsonb;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- ============================================================
+-- 7c. Ensure project_activity table exists
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'project_activity'
+  ) THEN
+    CREATE TABLE project_activity (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      actor_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      event_type text NOT NULL,
+      title text,
+      description text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_project_activity_project ON project_activity(project_id);
+    ALTER TABLE project_activity ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY activity_select_own ON project_activity
+      FOR SELECT TO authenticated USING (auth.uid() = actor_id);
+    CREATE POLICY activity_insert_own ON project_activity
+      FOR INSERT TO authenticated WITH CHECK (auth.uid() = actor_id);
+  END IF;
+END $$;
+
+-- ============================================================
 -- 8. Handle verification_requests → verification_service_requests rename
 -- ============================================================
 DO $$
