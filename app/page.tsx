@@ -691,7 +691,7 @@ export default function LandingPage() {
       </main>
 
       {/* ─── 9. FOOTER ─── */}
-      <footer className="bg-foreground text-muted-foreground pt-16 pb-8">
+      <footer className="bg-white text-gray-600 border-t border-gray-200 pt-16 pb-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
             <div className="col-span-2">
@@ -703,7 +703,7 @@ export default function LandingPage() {
                       <path d="M3 18C3 18 6 16 9 18C12 20 12 20 15 18C18 16 21 18 21 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                     </svg>
                   </div>
-                  <span className="font-display text-lg font-semibold text-white">Carbon<span className="text-accent">Rush</span> AI</span>
+                  <span className="font-display text-lg font-semibold text-gray-900">Carbon<span className="text-accent">Rush</span> AI</span>
                 </div>
               </Link>
               <p className="text-sm leading-relaxed max-w-xs mb-4">
@@ -711,7 +711,7 @@ export default function LandingPage() {
               </p>
               <div className="flex gap-3 text-xs">
                 {['Twitter', 'LinkedIn', 'GitHub'].map((s) => (
-                  <span key={s} className="hover:text-white transition-colors cursor-pointer">{s}</span>
+                  <span key={s} className="hover:text-gray-900 transition-colors cursor-pointer">{s}</span>
                 ))}
               </div>
             </div>
@@ -735,11 +735,11 @@ export default function LandingPage() {
               },
             ].map((col) => (
               <div key={col.title}>
-                <h4 className="text-sm font-semibold text-white mb-4">{col.title}</h4>
+                <h4 className="text-sm font-semibold text-gray-900 mb-4">{col.title}</h4>
                 <ul className="space-y-2.5">
                   {col.links.map((link) => (
                     <li key={link}>
-                      <a href="#" className="text-sm hover:text-white transition-colors">{link}</a>
+                      <a href="#" className="text-sm hover:text-gray-900 transition-colors">{link}</a>
                     </li>
                   ))}
                 </ul>
@@ -747,12 +747,12 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground">
+          <div className="pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
             <p suppressHydrationWarning>&copy; {new Date().getFullYear()} CarbonRush AI. All rights reserved.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <a href="#" className="hover:text-white transition-colors">Cookies</a>
+              <a href="#" className="hover:text-gray-900 transition-colors">Privacy</a>
+              <a href="#" className="hover:text-gray-900 transition-colors">Terms</a>
+              <a href="#" className="hover:text-gray-900 transition-colors">Cookies</a>
             </div>
           </div>
         </div>

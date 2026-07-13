@@ -40,52 +40,53 @@ export default function PartnerDashboard() {
   React.useEffect(() => {
     if (!user) return;
     (async () => {
-      // Fetch Supported Projects
-      const { data: contributions } = await supabase
-        .from('project_support')
-        .select('project_id')
-        .eq('partner_id', user.id);
-      
-      const projectIds = new Set((contributions || []).map((c: ProjectSupport) => c.project_id));
-      
-      // Fetch Saved Projects count
-      const { count: savedCount } = await supabase
-        .from('saved_projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', user.id);
-
-      // Fetch Followed Projects count
-      const { count: followedCount } = await supabase
-        .from('followed_projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', user.id);
-
-      setStats((prev) => ({
-        ...prev,
-        supportedProjects: projectIds.size,
-        savedProjects: savedCount || 0,
-        followedProjects: followedCount || 0,
-      }));
-
-      if (projectIds.size > 0) {
-        const { data: projects } = await supabase
-          .from('projects')
-          .select('*, profiles!owner_id(organization, full_name)')
-          .in('id', Array.from(projectIds));
-          
-        setSupportedProjectsList(projects || []);
-
-        const active = (projects || []).filter((p: Project) => p.status === 'active' || p.status === 'verified').length;
-        const area = (projects || []).reduce((s: number, p: Project) => s + (p.area_hectares || 0), 0);
-        const carbon = (projects || []).reduce((s: number, p: Project) => s + (p.target_carbon_tonnes || 0), 0);
+      try {
+        const { data: contributions } = await supabase
+          .from('project_support')
+          .select('project_id')
+          .eq('partner_id', user.id);
         
+        const projectIds = new Set((contributions || []).map((c: ProjectSupport) => c.project_id));
+        
+        const { count: savedCount } = await supabase
+          .from('saved_projects')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', user.id);
+
+        const { count: followedCount } = await supabase
+          .from('followed_projects')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', user.id);
+
         setStats((prev) => ({
           ...prev,
-          activeProjects: active,
-          totalArea: area,
-          carbonSequestered: carbon,
-          ngosPartnered: 0,
+          supportedProjects: projectIds.size,
+          savedProjects: savedCount || 0,
+          followedProjects: followedCount || 0,
         }));
+
+        if (projectIds.size > 0) {
+          const { data: projects } = await supabase
+            .from('projects')
+            .select('*, profiles!owner_id(organization, full_name)')
+            .in('id', Array.from(projectIds));
+            
+          setSupportedProjectsList(projects || []);
+
+          const active = (projects || []).filter((p: Project) => p.status === 'active' || p.status === 'verified').length;
+          const area = (projects || []).reduce((s: number, p: Project) => s + (p.area_hectares || 0), 0);
+          const carbon = (projects || []).reduce((s: number, p: Project) => s + (p.target_carbon_tonnes || 0), 0);
+          
+          setStats((prev) => ({
+            ...prev,
+            activeProjects: active,
+            totalArea: area,
+            carbonSequestered: carbon,
+            ngosPartnered: 0,
+          }));
+        }
+      } catch {
+        // Tables may not exist yet in production
       }
     })();
   }, [user]);
