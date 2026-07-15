@@ -10,9 +10,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FileUpload } from '@/components/shared/FileUpload';
+import { AiAnalysisCard } from '@/components/ai/AiAnalysisCard';
 import {
   Gavel,
   CheckCircle2,
@@ -21,6 +21,7 @@ import {
   Clock,
   History,
   ShieldCheck,
+  Brain,
 } from 'lucide-react';
 import {
   VERIFICATION_DECISION_LABELS,
@@ -42,8 +43,8 @@ export default function DecisionPage() {
   const [justification, setJustification] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [uploadedFilePath, setUploadedFilePath] = React.useState<string | null>(null);
+  const [aiAnalyses, setAiAnalyses] = React.useState<any[]>([]);
 
-  // Find the active request for this project
   const projectRequests = requests.filter((r) => r.project_id === projectId);
   const activeRequest = projectRequests.find((r) => r.status === 'pending' || r.status === 'in_review') || projectRequests[0];
 
@@ -52,6 +53,22 @@ export default function DecisionPage() {
       setSelectedRequestId(activeRequest.id);
     }
   }, [activeRequest, selectedRequestId]);
+
+  React.useEffect(() => {
+    const fetchAiAnalyses = async () => {
+      if (!projectId) return;
+      try {
+        const response = await fetch(`/api/ai-analysis?project_id=${projectId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAiAnalyses(data.analyses || []);
+        }
+      } catch {
+        console.error('Failed to fetch AI analyses');
+      }
+    };
+    fetchAiAnalyses();
+  }, [projectId]);
 
   const handleSubmit = async () => {
     if (!decision || !user || !selectedRequestId) {
@@ -64,7 +81,6 @@ export default function DecisionPage() {
     }
     setSubmitting(true);
     try {
-      // Insert decision record
       const { error: decError } = await supabase.from('verification_service_decisions').insert({
         request_id: selectedRequestId,
         verifier_id: user.id,
@@ -74,7 +90,6 @@ export default function DecisionPage() {
       });
       if (decError) throw decError;
 
-      // Update request status
       const statusMap: Record<VerificationDecision, string> = {
         approved: 'approved',
         rejected: 'rejected',
@@ -86,7 +101,6 @@ export default function DecisionPage() {
         .eq('id', selectedRequestId);
       if (reqError) throw reqError;
 
-      // If approved, update project status and issue passport
       if (decision === 'approved' && project) {
         await supabase
           .from('projects')
@@ -111,7 +125,6 @@ export default function DecisionPage() {
         await supabase.from('projects').update(statusUpdate).eq('id', projectId);
       }
 
-      // Log activity
       await supabase.from('project_activity').insert({
         project_id: projectId,
         actor_id: user.id,
@@ -146,11 +159,10 @@ export default function DecisionPage() {
       <div>
         <h1 className="font-display text-xl font-semibold">Decision Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Submit your verification decision. Every action is permanently recorded in the audit trail.
+          Review AI analysis and submit your verification decision. Every action is permanently recorded.
         </p>
       </div>
 
-      {/* Current Request Info */}
       {activeRequest ? (
         <Card className="p-5">
           <div className="flex items-center gap-3">
@@ -178,12 +190,30 @@ export default function DecisionPage() {
         </Card>
       )}
 
-      {/* Decision Form */}
+      {aiAnalyses.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Brain className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">AI Analysis ({aiAnalyses.length})</h2>
+          </div>
+          {aiAnalyses.slice(0, 3).map((analysis) => (
+            <AiAnalysisCard key={analysis.id} analysis={analysis} compact />
+          ))}
+          {aiAnalyses.length > 3 && (
+            <p className="text-xs text-muted-foreground text-center">
+              +{aiAnalyses.length - 3} more analyses.{' '}
+              <a href={`/dashboard/projects/${projectId}/ai-review`} className="text-primary hover:underline">
+                View all
+              </a>
+            </p>
+          )}
+        </div>
+      )}
+
       {activeRequest && (
         <Card className="p-6">
           <h2 className="mb-4 font-display text-lg font-semibold">Submit Decision</h2>
 
-          {/* Decision Buttons */}
           <div className="mb-6 grid gap-3 sm:grid-cols-3">
             <DecisionButton
               active={decision === 'approved'}
@@ -257,7 +287,6 @@ export default function DecisionPage() {
         </Card>
       )}
 
-      {/* Decision History */}
       {selectedRequestId && decisions.length > 0 && (
         <Card className="p-6">
           <div className="mb-4 flex items-center gap-2">

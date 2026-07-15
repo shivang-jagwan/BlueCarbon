@@ -67,10 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
+    const { data: { session } } = await supabase.auth.getSession();
     const profile = await loadProfile(user.id);
     setState({
       user,
-      session: null,
+      session: session,
       profile,
       role: profile?.role ?? null,
       approvalStatus: profile?.approval_status ?? null,

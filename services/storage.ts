@@ -7,6 +7,11 @@ export async function uploadFile(
   category: string, 
   projectId?: string
 ) {
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error('File size exceeds 50MB limit');
+  }
+
   // Check auth
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) throw new Error('You must be signed in to upload files');
@@ -32,9 +37,6 @@ export async function uploadFile(
     throw new Error(`Storage error: ${uploadError.message}`);
   }
 
-  // Get public URL if bucket is public, else it requires signed URLs later
-  const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-  
   // If this is a project file, record it in project_files table
   let fileRecord = null;
   if (projectId) {
@@ -52,7 +54,6 @@ export async function uploadFile(
         file_type: fileType,
         category: category,
         storage_path: uploadData.path,
-        public_url: publicUrlData.publicUrl,
         file_size: file.size,
         mime_type: file.type,
       })
@@ -71,10 +72,9 @@ export async function uploadFile(
       description: `Uploaded file: ${file.name}`,
     });
   } else {
-    // For profile-related files, we just return the storage details
+    // For profile-related files, return storage details only
     fileRecord = {
       storage_path: uploadData.path,
-      public_url: publicUrlData.publicUrl,
       file_name: file.name,
     };
   }

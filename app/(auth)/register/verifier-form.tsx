@@ -48,19 +48,23 @@ const schema = z.object({
   organization_name: z.string().min(2, 'Organization name is required'),
   organization_type: z.string().min(1, 'Select organization type'),
   registration_number: z.string().min(1, 'Registration number is required'),
-  email: z.string().min(1, 'Email is required'),
+  email: z.string().email('Enter a valid email'),
   contact_number: z.string().min(10, 'Enter a valid contact number'),
   website: z.string().optional(),
   rep_full_name: z.string().min(2, 'Representative name is required'),
   designation: z.string().min(1, 'Designation is required'),
-  rep_email: z.string().min(1, 'Email is required'),
+  rep_email: z.string().email('Enter a valid email'),
   rep_mobile: z.string().min(10, 'Enter a valid mobile number'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirm_password: z.string(),
   country: z.string().min(1, 'Country is required'),
   state: z.string().min(1, 'State is required'),
   district: z.string().min(1, 'District is required'),
   office_address: z.string().min(5, 'Office address is required'),
   pin_code: z.string().min(6, 'PIN code must be 6 digits'),
+}).refine((data) => data.password === data.confirm_password, {
+  message: 'Passwords do not match',
+  path: ['confirm_password'],
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -96,6 +100,7 @@ export default function VerifierRegisterForm() {
       rep_email: '',
       rep_mobile: '',
       password: '',
+      confirm_password: '',
       country: 'India',
       state: '',
       district: '',
@@ -105,7 +110,7 @@ export default function VerifierRegisterForm() {
   });
 
   const stepFields: Record<number, (keyof FormValues)[]> = {
-    0: ['organization_name', 'organization_type', 'registration_number', 'email', 'contact_number', 'website', 'password'],
+    0: ['organization_name', 'organization_type', 'registration_number', 'email', 'contact_number', 'website', 'password', 'confirm_password'],
     1: ['rep_full_name', 'designation', 'rep_email', 'rep_mobile'],
     2: [],
     3: ['country', 'state', 'district', 'office_address', 'pin_code'],
@@ -370,6 +375,17 @@ export default function VerifierRegisterForm() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl><Input type="password" placeholder="Min. 8 characters" autoComplete="new-password" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirm_password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl><Input type="password" placeholder="Repeat password" autoComplete="new-password" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

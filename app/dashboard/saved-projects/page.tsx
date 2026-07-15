@@ -79,7 +79,7 @@ export default function SavedProjectsPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Saved Projects</h1>
           <p className="mt-2 text-muted-foreground">
-            Projects you've bookmarked for future evaluation or support.
+            Projects you&apos;ve bookmarked for future evaluation or support.
           </p>
         </div>
         {projects.length > 0 && (
@@ -104,7 +104,7 @@ export default function SavedProjectsPage() {
           <div className="max-w-sm">
             <h3 className="font-semibold text-lg">No saved projects</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              You haven't bookmarked any projects yet. Head over to the Discovery Hub to find projects to support.
+              You haven&apos;t bookmarked any projects yet. Head over to the Discovery Hub to find projects to support.
             </p>
           </div>
           <Button asChild className="mt-2">

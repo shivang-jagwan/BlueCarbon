@@ -86,7 +86,7 @@ export default function ProjectVerificationPage() {
           <div>
             <h3 className="font-semibold">No Verification Requests</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              You haven't requested verification for this project yet. 
+              You haven&apos;t requested verification for this project yet.
               Browse the Verifier Directory to get started.
             </p>
           </div>

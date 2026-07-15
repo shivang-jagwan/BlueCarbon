@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   Eye,
   ShieldCheck,
+  Landmark,
 } from 'lucide-react';
 import {
   PROJECT_TYPE_LABELS,
@@ -44,6 +45,7 @@ const OWNER_TABS = [
   { label: 'Evidence', href: '/evidence', icon: Upload },
   { label: 'Monitoring', href: '/monitoring', icon: ClipboardList },
   { label: 'Documents', href: '/documents', icon: FileText },
+  { label: 'Land Ownership', href: '/land-ownership', icon: Landmark },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Revenue', href: '/revenue', icon: DollarSign },
   { label: 'Carbon Passport', href: '/passport', icon: Award },
@@ -56,6 +58,7 @@ const VERIFIER_TABS = [
   { label: 'Overview', href: '', icon: LayoutDashboard },
   { label: 'Map', href: '/map', icon: Map },
   { label: 'Evidence Review', href: '/evidence', icon: CheckCircle2 },
+  { label: 'Land Ownership', href: '/land-ownership', icon: Landmark },
   { label: 'Monthly Reviews', href: '/monitoring', icon: ClipboardList },
   { label: 'Discussion', href: '/discussion', icon: MessageSquare },
   { label: 'AI Review', href: '/ai-review', icon: Sparkles },

@@ -10,11 +10,45 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   FolderKanban, ShieldCheck, ClipboardCheck, Building2, Award, Sparkles,
-  ArrowRight, CalendarDays, Bell, CheckCircle2, Clock,
+  ArrowRight, CalendarDays, Bell, CheckCircle2, Clock, Camera, MapPin,
 } from 'lucide-react';
 import { getRoleLabel } from '@/lib/navigation';
 import { VERIFICATION_REQUEST_TYPE_LABELS, VERIF_REQUEST_STATUS_LABELS, verificationStatusColor, priorityColor } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase/client';
+
+function EvidenceStatsKpiCards({ projectIds }: { projectIds: string[] }) {
+  const [stats, setStats] = React.useState({ total: 0, valid: 0, flagged: 0, gpsValid: 0 });
+
+  React.useEffect(() => {
+    if (projectIds.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from('verification_evidence')
+        .select('validation_status, fraud_score, latitude, longitude')
+        .in('project_id', projectIds);
+      if (data) {
+        setStats({
+          total: data.length,
+          valid: data.filter((e: any) => e.validation_status === 'valid').length,
+          flagged: data.filter((e: any) => e.fraud_score > 40).length,
+          gpsValid: data.filter((e: any) => e.latitude != null && e.longitude != null).length,
+        });
+      }
+    })();
+  }, [projectIds.join(',')]);
+
+  if (projectIds.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiCard label="Evidence Uploaded" value={stats.total} icon={Camera} />
+      <KpiCard label="GPS Validated" value={stats.gpsValid} hint={`${stats.total > 0 ? Math.round((stats.gpsValid / stats.total) * 100) : 0}%`} icon={MapPin} />
+      <KpiCard label="Evidence Valid" value={stats.valid} hint={`${stats.total > 0 ? Math.round((stats.valid / stats.total) * 100) : 0}%`} icon={CheckCircle2} />
+      <KpiCard label="High Fraud Risk" value={stats.flagged} hint={stats.flagged > 0 ? 'Needs review' : 'All clear'} icon={ShieldCheck} />
+    </div>
+  );
+}
 
 const QUICK_ACTIONS = [
   { label: 'Open Verification Center', href: '/dashboard/verification', icon: ShieldCheck, color: 'text-primary' },
@@ -58,6 +92,9 @@ export default function VerifierDashboard() {
         <KpiCard label="AI Flagged" value={requests.filter((r) => r.status === 'changes_requested').length} hint="Needs attention" icon={Sparkles} />
         <KpiCard label="Unread Notifications" value={unreadNotifications} icon={Bell} />
       </div>
+
+      {/* Evidence KPIs */}
+      <EvidenceStatsKpiCards projectIds={projects.map((p) => p.id)} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {QUICK_ACTIONS.map((action) => {

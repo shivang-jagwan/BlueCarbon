@@ -229,7 +229,7 @@ export default function MonitoringPage() {
                       {p.start_date && <span><span className="font-medium">Starts:</span> {p.start_date}</span>}
                     </div>
                     {p.message && (
-                      <p className="mt-2 text-sm text-muted-foreground italic">"{p.message}"</p>
+                      <p className="mt-2 text-sm text-muted-foreground italic">&ldquo;{p.message}&rdquo;</p>
                     )}
                   </div>
                   <div className="flex gap-2">

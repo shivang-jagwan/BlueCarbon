@@ -20,6 +20,11 @@ import {
   Globe,
   User,
   Settings,
+  Camera,
+  Landmark,
+  Shield,
+  AlertTriangle,
+  Fingerprint,
   type LucideIcon,
 } from 'lucide-react';
 import type { AppRole } from '@/lib/types';
@@ -55,6 +60,7 @@ export const OWNER_NAV: NavSection[] = [
   {
     title: 'Account',
     items: [
+      { label: 'Identity Verification', href: '/dashboard/identity', icon: Fingerprint },
       { label: 'Calendar', href: '/dashboard/calendar', icon: CalendarDays },
       { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
       { label: 'Profile', href: '/dashboard/profile', icon: User },
@@ -133,7 +139,18 @@ export const ADMIN_NAV: NavSection[] = [
       { label: 'User Management', href: '/admin/users', icon: Users },
       { label: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
       { label: 'Projects', href: '/admin/projects', icon: FolderKanban },
+      { label: 'Evidence Review', href: '/admin/evidence', icon: Camera },
+      { label: 'Land Ownership', href: '/admin/land-ownership', icon: Landmark },
+      { label: 'Identity Review', href: '/admin/identity', icon: Fingerprint },
       { label: 'Organizations', href: '/admin/organizations', icon: Building2 },
+    ],
+  },
+  {
+    title: 'Security',
+    items: [
+      { label: 'Audit Center', href: '/admin/audit', icon: Shield },
+      { label: 'Verification Conflicts', href: '/admin/conflicts', icon: AlertTriangle },
+      { label: 'Security Events', href: '/admin/audit#security', icon: ShieldCheck },
     ],
   },
   {

@@ -48,7 +48,7 @@ import { uploadFile } from '@/services/storage';
 
 const schema = z.object({
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().min(1, 'Email is required'),
+  email: z.string().email('Enter a valid email'),
   mobile_number: z.string().min(10, 'Enter a valid mobile number'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirm_password: z.string(),

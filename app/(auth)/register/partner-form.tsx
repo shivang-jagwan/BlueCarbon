@@ -50,13 +50,14 @@ const schema = z.object({
   cin: z.string().min(1, 'CIN is required'),
   gst: z.string().min(1, 'GST is required'),
   website: z.string().optional(),
-  email: z.string().min(1, 'Email is required'),
+  email: z.string().email('Enter a valid email'),
   contact_number: z.string().min(10, 'Enter a valid contact number'),
   rep_full_name: z.string().min(2, 'Representative name is required'),
   designation: z.string().min(1, 'Designation is required'),
-  rep_email: z.string().min(1, 'Email is required'),
+  rep_email: z.string().email('Enter a valid email'),
   rep_mobile: z.string().min(10, 'Enter a valid mobile number'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirm_password: z.string(),
   esg_goals: z.string().min(10, 'Describe your ESG goals'),
   csr_objectives: z.string().min(10, 'Describe your CSR objectives'),
   net_zero_target_year: z.string().optional(),
@@ -66,6 +67,9 @@ const schema = z.object({
   city: z.string().min(1, 'City is required'),
   office_address: z.string().min(5, 'Office address is required'),
   pin_code: z.string().min(6, 'PIN code must be 6 digits'),
+}).refine((data) => data.password === data.confirm_password, {
+  message: 'Passwords do not match',
+  path: ['confirm_password'],
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -102,6 +106,7 @@ export default function PartnerRegisterForm() {
       rep_email: '',
       rep_mobile: '',
       password: '',
+      confirm_password: '',
       esg_goals: '',
       csr_objectives: '',
       net_zero_target_year: '',
@@ -115,7 +120,7 @@ export default function PartnerRegisterForm() {
   });
 
   const stepFields: Record<number, (keyof FormValues)[]> = {
-    0: ['company_name', 'industry', 'cin', 'gst', 'website', 'email', 'contact_number', 'password'],
+    0: ['company_name', 'industry', 'cin', 'gst', 'website', 'email', 'contact_number', 'password', 'confirm_password'],
     1: ['rep_full_name', 'designation', 'rep_email', 'rep_mobile'],
     2: ['esg_goals', 'csr_objectives', 'net_zero_target_year', 'annual_csr_budget'],
     3: ['country', 'state', 'city', 'office_address', 'pin_code'],
@@ -391,6 +396,17 @@ export default function PartnerRegisterForm() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl><Input type="password" placeholder="Min. 8 characters" autoComplete="new-password" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirm_password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl><Input type="password" placeholder="Repeat password" autoComplete="new-password" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

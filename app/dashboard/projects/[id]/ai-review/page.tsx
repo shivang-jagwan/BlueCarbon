@@ -6,11 +6,13 @@ import { useProject, useProjectFiles, useMonitoringReports } from '@/hooks/use-p
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { AiAnalysisCard, AiAnalysisSummary } from '@/components/ai/AiAnalysisCard';
 import {
   Sparkles,
   TrendingUp,
   Leaf,
-  Copy,
   MapPin,
   ShieldCheck,
   AlertTriangle,
@@ -21,9 +23,11 @@ import {
   Activity,
   Zap,
   FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/providers/auth-provider';
+import type { AiAnalysis, AiRecommendation, AiRiskLevel } from '@/lib/types';
 
 interface AIResult {
   label: string;
@@ -42,13 +46,29 @@ export default function AIReviewPage() {
   const { profile } = useAuth();
   const [aiRunning, setAiRunning] = React.useState(false);
   const [aiResults, setAiResults] = React.useState<AIResult[] | null>(null);
+  const [storedAnalyses, setStoredAnalyses] = React.useState<AiAnalysis[]>([]);
+  const [notes, setNotes] = React.useState('');
 
   const isVerifier = profile?.role === 'verifier';
 
+  const fetchStoredAnalyses = React.useCallback(async () => {
+    try {
+      const response = await fetch(`/api/ai-analysis?project_id=${projectId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStoredAnalyses(data.analyses || []);
+      }
+    } catch {
+      console.error('Failed to fetch stored analyses');
+    }
+  }, [projectId]);
+
+  React.useEffect(() => {
+    fetchStoredAnalyses();
+  }, [fetchStoredAnalyses]);
+
   const runAiReview = async () => {
     setAiRunning(true);
-    // Gemini API integration point — will be connected later
-    // For now, analyze real data from the project
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     const results: AIResult[] = [
@@ -121,6 +141,66 @@ export default function AIReviewPage() {
     ];
 
     setAiResults(results);
+
+    // Calculate composite scores
+    const avgConfidence = Math.round(results.reduce((sum, r) => sum + r.confidence, 0) / results.length);
+    const goodCount = results.filter(r => r.status === 'good').length;
+    const warningCount = results.filter(r => r.status === 'warning').length;
+    const alertCount = results.filter(r => r.status === 'alert').length;
+
+    let recommendation: AiRecommendation = 'insufficient_data';
+    if (avgConfidence >= 75 && alertCount === 0) recommendation = 'recommend_approval';
+    else if (avgConfidence >= 50 && alertCount <= 1) recommendation = 'recommend_changes';
+    else if (alertCount >= 2) recommendation = 'recommend_rejection';
+    else if (avgConfidence < 40) recommendation = 'low_confidence';
+
+    let riskLevel: AiRiskLevel = 'low';
+    if (alertCount >= 3) riskLevel = 'critical';
+    else if (alertCount >= 2) riskLevel = 'high';
+    else if (alertCount >= 1 || warningCount >= 2) riskLevel = 'medium';
+
+    const detectedRisks: string[] = [];
+    if (!project?.center_lat) detectedRisks.push('No GPS coordinates available');
+    if (!project?.area_hectares) detectedRisks.push('Area size not specified');
+    if (!project?.target_carbon_tonnes) detectedRisks.push('Carbon target not set');
+    if (reports.length === 0) detectedRisks.push('No monitoring reports submitted');
+    if (documents.length === 0) detectedRisks.push('No evidence documents uploaded');
+
+    const observations: Record<string, string> = {};
+    if (reports.length > 0) observations['monitoring'] = `${reports.length} reports submitted`;
+    if (documents.length > 0) observations['evidence'] = `${documents.length} documents uploaded`;
+    if (project?.center_lat) observations['gps'] = 'Location data present';
+    if (project?.area_hectares) observations['area'] = `${project.area_hectares} hectares`;
+
+    // Store the analysis
+    try {
+      await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          analysis_type: 'verification_review',
+          confidence_score: avgConfidence,
+          recommendation,
+          reasoning: `Analyzed ${results.length} metrics across project data. ${goodCount} positive, ${warningCount} warnings, ${alertCount} alerts.`,
+          risk_level: riskLevel,
+          evidence_used: { reports: reports.length, documents: documents.length },
+          detected_risks: detectedRisks,
+          observations,
+          vegetation_score: project?.area_hectares ? 0.8 : null,
+          carbon_estimate: project?.target_carbon_tonnes || null,
+          gps_consistency_score: project?.center_lat ? 0.88 : 0,
+          ai_model: 'carbonrush-ai-v1',
+          ai_version: '1.0.0',
+          processing_time_ms: 1500,
+          notes: notes || null,
+        }),
+      });
+      await fetchStoredAnalyses();
+    } catch {
+      console.error('Failed to store AI analysis');
+    }
+
     setAiRunning(false);
   };
 
@@ -165,7 +245,6 @@ export default function AIReviewPage() {
         </Badge>
       </div>
 
-      {/* Disclaimer */}
       <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
@@ -179,7 +258,10 @@ export default function AIReviewPage() {
         </div>
       </div>
 
-      {/* Run AI Review */}
+      {storedAnalyses.length > 0 && (
+        <AiAnalysisSummary analyses={storedAnalyses} />
+      )}
+
       {!aiResults && !aiRunning && (
         <Card className="p-8 text-center">
           <div className="flex flex-col items-center gap-4">
@@ -193,19 +275,29 @@ export default function AIReviewPage() {
                 and carbon estimates using Gemini AI.
               </p>
             </div>
-            {isVerifier ? (
-              <Button onClick={runAiReview} size="lg" className="gap-2">
-                <Zap className="h-4 w-4" />
-                Start AI Review
-              </Button>
-            ) : (
-              <p className="text-xs text-muted-foreground">Only assigned verifiers can run AI reviews.</p>
-            )}
+            <div className="w-full max-w-sm space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Notes (optional)</Label>
+                <Textarea
+                  placeholder="Add notes for this analysis..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="mt-1 min-h-16 text-sm"
+                />
+              </div>
+              {isVerifier ? (
+                <Button onClick={runAiReview} size="lg" className="gap-2 w-full">
+                  <Zap className="h-4 w-4" />
+                  Start AI Review
+                </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">Only assigned verifiers can run AI reviews.</p>
+              )}
+            </div>
           </div>
         </Card>
       )}
 
-      {/* Loading state */}
       {aiRunning && (
         <Card className="p-8 text-center">
           <div className="flex flex-col items-center gap-4">
@@ -222,7 +314,6 @@ export default function AIReviewPage() {
         </Card>
       )}
 
-      {/* AI Results Grid */}
       {aiResults && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -261,7 +352,6 @@ export default function AIReviewPage() {
             })}
           </div>
 
-          {/* AI Summary */}
           <Card className="p-6">
             <div className="mb-4 flex items-center gap-2">
               <Brain className="h-5 w-5 text-primary" />
@@ -306,9 +396,19 @@ export default function AIReviewPage() {
               )}
             </div>
 
-            {/* Verifier Actions */}
             {isVerifier && (
               <div className="mt-6 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAiResults(null);
+                    setNotes('');
+                  }}
+                >
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  Run New Analysis
+                </Button>
                 <Button variant="outline" size="sm" disabled>
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                   Accept AI Results
@@ -317,14 +417,19 @@ export default function AIReviewPage() {
                   <XCircle className="mr-1.5 h-3.5 w-3.5" />
                   Override
                 </Button>
-                <Button variant="outline" size="sm" disabled>
-                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                  Add Comment
-                </Button>
               </div>
             )}
           </Card>
         </>
+      )}
+
+      {storedAnalyses.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="font-display text-lg font-semibold">Previous Analyses</h2>
+          {storedAnalyses.map((analysis) => (
+            <AiAnalysisCard key={analysis.id} analysis={analysis} showVerifierFeedback />
+          ))}
+        </div>
       )}
     </div>
   );

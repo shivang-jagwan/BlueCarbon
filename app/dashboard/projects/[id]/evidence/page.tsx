@@ -2,173 +2,329 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { useProjectFiles } from '@/hooks/use-projects';
+import { useProject } from '@/hooks/use-projects';
 import { useAuth } from '@/components/providers/auth-provider';
-import { supabase } from '@/lib/supabase/client';
-import { toast } from 'sonner';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useEvidence, useEvidenceStats } from '@/hooks/use-evidence';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Upload,
-  FileText,
+  Camera,
+  ShieldCheck,
+  MapPin,
   Image as ImageIcon,
   Video,
-  FileCheck,
+  Plane,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
   Clock,
-  Download,
-  Trash2,
+  Upload,
+  BarChart3,
 } from 'lucide-react';
-import { FileUpload } from '@/components/shared/FileUpload';
 import { cn } from '@/lib/utils';
-
-const CATEGORIES = [
-  { id: 'ground_image', label: 'Ground Image', icon: ImageIcon },
-  { id: 'drone_image', label: 'Drone Image', icon: ImageIcon },
-  { id: 'video', label: 'Video', icon: Video },
-  { id: 'gps_log', label: 'GPS Log', icon: FileText },
-  { id: 'survey_report', label: 'Survey Report', icon: FileCheck },
-  { id: 'water_quality', label: 'Water Quality', icon: FileText },
-  { id: 'soil_report', label: 'Soil Report', icon: FileText },
-];
-
-function getIcon(mime: string | null) {
-  if (!mime) return FileText;
-  if (mime.startsWith('image/')) return ImageIcon;
-  if (mime.startsWith('video/')) return Video;
-  if (mime === 'application/pdf') return FileCheck;
-  return FileText;
-}
-
-function formatSize(bytes: number | null) {
-  if (!bytes) return '—';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+import { EvidenceCapture } from '@/components/evidence/EvidenceCapture';
+import { EvidenceGallery } from '@/components/evidence/EvidenceGallery';
+import { EvidenceMap } from '@/components/evidence/EvidenceMap';
+import { FraudScoreBadge } from '@/components/evidence/FraudScoreBadge';
+import { supabase } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 export default function EvidencePage() {
   const params = useParams();
   const projectId = params.id as string;
-  const { files: documents, loading, refetch } = useProjectFiles(projectId);
-  const { user } = useAuth();
-  const [selectedCategory, setSelectedCategory] = React.useState('ground_image');
+  const { project } = useProject(projectId);
+  const { profile } = useAuth();
+  const { evidence, loading, refetch } = useEvidence(projectId);
+  const { stats } = useEvidenceStats(projectId);
 
+  const role = profile?.role;
+  const isOwner = role === 'project_owner';
+  const isPartner = role === 'sustainability_partner';
+  const isVerifier = role === 'verifier';
+  const isAdmin = role === 'admin';
+  const readOnly = isOwner || isPartner;
 
+  const projectBoundary = {
+    boundary_geojson: project?.boundary_geojson ?? null,
+    center_lat: project?.center_lat ?? null,
+    center_lng: project?.center_lng ?? null,
+    allowed_radius_meters: 100,
+  };
 
-  const handleDelete = async (docId: string, filePath: string) => {
+  const handleDelete = async (evidenceId: string, storagePath: string) => {
     try {
-      await supabase.storage.from('evidence').remove([filePath]);
-      await supabase.from('project_files').delete().eq('id', docId);
-      toast.success('Document deleted');
+      await supabase.storage.from('evidence-verified').remove([storagePath]);
+      await supabase.from('verification_evidence').delete().eq('id', evidenceId);
+      toast.success('Evidence deleted');
       refetch();
-    } catch (err) {
-      toast.error('Failed to delete document');
+    } catch {
+      toast.error('Failed to delete evidence');
     }
   };
+
+  const photoCount = evidence.filter((e) => e.evidence_type === 'photo').length;
+  const uniqueGpsPositions = new Set(
+    evidence
+      .filter((e) => e.latitude != null && e.longitude != null)
+      .map((e) => `${Math.round(e.latitude! * 10000)},${Math.round(e.longitude! * 10000)}`)
+  ).size;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-xl font-semibold">Evidence Center</h1>
+          <h1 className="font-display text-xl font-semibold">
+            {readOnly ? 'Evidence Review' : 'Evidence Upload'}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Upload and manage monitoring evidence and field data
+            {readOnly
+              ? 'View monitoring evidence collected during field verification'
+              : 'Upload and validate geo-tagged evidence for monitoring visits'}
           </p>
         </div>
+        {!readOnly && (
+          <Badge variant="outline" className="gap-1">
+            <Upload className="h-3 w-3" />
+            Upload Mode
+          </Badge>
+        )}
+        {readOnly && (
+          <Badge variant="outline" className="gap-1">
+            <ShieldCheck className="h-3 w-3" />
+            Read Only
+          </Badge>
+        )}
       </div>
 
-      {/* Upload Area */}
-      <Card className="p-6">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
-                  selectedCategory === cat.id
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
-        <FileUpload
-          bucket="evidence"
-          projectId={projectId}
-          category={selectedCategory}
-          onUploadSuccess={() => refetch()}
-          label={`Upload to ${CATEGORIES.find((c) => c.id === selectedCategory)?.label}`}
-          description="Click to browse or drag and drop (Max 50MB)"
-        />
-      </Card>
-
-      {/* Documents List */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Clock className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : documents.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-          <FileText className="h-10 w-10 text-muted-foreground/40" />
-          <div>
-            <h3 className="font-semibold">No evidence uploaded yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload ground images, drone footage, surveys, and reports
-            </p>
-          </div>
-        </Card>
-      ) : (
-        <div className="grid gap-3">
-          {documents.map((doc) => {
-            const Icon = getIcon(doc.mime_type);
-            const cat = CATEGORIES.find((c) => c.id === doc.category);
-            return (
-              <Card key={doc.id} className="flex items-center gap-4 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-medium">{doc.file_name}</p>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    {cat && <Badge variant="secondary" className="text-xs">{cat.label}</Badge>}
-                    <span className="text-xs text-muted-foreground">{formatSize(doc.file_size)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={async () => {
-                    try {
-                      const { data } = await supabase.storage.from('evidence').createSignedUrl(doc.storage_path, 60);
-                      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-                      else toast.error('Could not generate download link');
-                    } catch { toast.error('Download failed'); }
-                  }}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(doc.id, doc.storage_path)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
+      {/* Stats Grid */}
+      {stats && (
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-6">
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-primary" />
+              <div>
+                <p className="text-xs text-muted-foreground">Photos</p>
+                <p className="text-lg font-semibold">{stats.photos}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-primary" />
+              <div>
+                <p className="text-xs text-muted-foreground">Videos</p>
+                <p className="text-lg font-semibold">{stats.videos}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <Plane className="h-4 w-4 text-primary" />
+              <div>
+                <p className="text-xs text-muted-foreground">Drone</p>
+                <p className="text-lg font-semibold">{stats.droneImages + stats.droneVideos}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" />
+              <div>
+                <p className="text-xs text-muted-foreground">GPS Valid</p>
+                <p className="text-lg font-semibold">{stats.gpsValid}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <div>
+                <p className="text-xs text-muted-foreground">Valid</p>
+                <p className="text-lg font-semibold">{stats.valid}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <div>
+                <p className="text-xs text-muted-foreground">Avg Fraud</p>
+                <p className="text-lg font-semibold">{stats.avgFraudScore}/100</p>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
+
+      {/* Multi-photo progress */}
+      {!readOnly && stats && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium">Monitoring Visit Progress</p>
+            <span className="text-xs text-muted-foreground">
+              {photoCount}/5 photos min • {uniqueGpsPositions} unique positions
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'h-2 flex-1 rounded-full transition-colors',
+                  i < photoCount ? 'bg-success' : 'bg-muted'
+                )}
+              />
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {photoCount >= 5 && uniqueGpsPositions >= 3
+              ? 'Minimum requirements met'
+              : photoCount >= 5
+              ? `Need ${Math.max(0, 3 - uniqueGpsPositions)} more unique GPS positions`
+              : `Need ${5 - photoCount} more photos`}
+          </p>
+        </Card>
+      )}
+
+      {/* Main Content */}
+      <Tabs defaultValue={readOnly ? 'gallery' : 'upload'} className="space-y-4">
+        <TabsList>
+          {!readOnly && (
+            <TabsTrigger value="upload" className="gap-1.5">
+              <Camera className="h-3.5 w-3.5" />
+              Upload Evidence
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="gallery" className="gap-1.5">
+            <ImageIcon className="h-3.5 w-3.5" />
+            Gallery ({evidence.length})
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-1.5">
+            <MapPin className="h-3.5 w-3.5" />
+            Map View
+          </TabsTrigger>
+          {(isAdmin || isVerifier) && (
+            <TabsTrigger value="analysis" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Analysis
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        {/* Upload Tab */}
+        {!readOnly && (
+          <TabsContent value="upload">
+            <EvidenceCapture
+              projectId={projectId}
+              projectBoundary={projectBoundary}
+              existingEvidence={evidence}
+              onSuccess={refetch}
+            />
+          </TabsContent>
+        )}
+
+        {/* Gallery Tab */}
+        <TabsContent value="gallery">
+          <EvidenceGallery
+            evidence={evidence}
+            loading={loading}
+            onDelete={!readOnly ? handleDelete : undefined}
+            readOnly={readOnly}
+          />
+        </TabsContent>
+
+        {/* Map Tab */}
+        <TabsContent value="map">
+          <EvidenceMap
+            markers={stats?.mapMarkers || []}
+            projectCenter={
+              project?.center_lat && project?.center_lng
+                ? { lat: project.center_lat, lng: project.center_lng }
+                : null
+            }
+          />
+        </TabsContent>
+
+        {/* Analysis Tab (Admin/Verifier only) */}
+        {(isAdmin || isVerifier) && (
+          <TabsContent value="analysis">
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Fraud Distribution */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Validation Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {stats && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                          Valid
+                        </span>
+                        <span className="text-sm font-medium">{stats.valid}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          Warning
+                        </span>
+                        <span className="text-sm font-medium">{stats.warning}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-destructive" />
+                          Rejected
+                        </span>
+                        <span className="text-sm font-medium">{stats.rejected}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          Pending
+                        </span>
+                        <span className="text-sm font-medium">{stats.pending}</span>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Fraud Flags */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Fraud Flags Detected</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {evidence
+                    .filter((e) => e.fraud_flags && e.fraud_flags.length > 0)
+                    .slice(0, 10)
+                    .map((item) => (
+                      <div key={item.id} className="flex items-start gap-2">
+                        <FraudScoreBadge score={item.fraud_score} showIcon={false} />
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-xs text-muted-foreground">
+                            {item.original_filename}
+                          </p>
+                          {item.fraud_flags?.map((flag, i) => (
+                            <p key={i} className="text-xs text-destructive">• {flag}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  {evidence.filter((e) => e.fraud_flags && e.fraud_flags.length > 0).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No fraud flags detected
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
