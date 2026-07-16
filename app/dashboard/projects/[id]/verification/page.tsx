@@ -874,16 +874,19 @@ export default function VerificationSubmitPage() {
 
         const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
 
-        const itemType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document';
+        const itemType: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
 
         const { data: itemRecord, error: dbError } = await supabase
           .from('project_gallery_items')
           .insert({
             project_id: projectId,
             uploaded_by: profile.id,
-            title: file.name,
-            type: itemType,
-            url: urlData.publicUrl,
+            caption: file.name,
+            media_type: itemType,
+            public_url: urlData.publicUrl,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
             storage_path: filePath,
           })
           .select()
