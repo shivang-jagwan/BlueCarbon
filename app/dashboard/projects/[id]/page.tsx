@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ProjectRelationshipCard } from '@/components/workspace/ProjectRelationshipCard';
 import { SaveProjectButton } from '@/components/shared/SaveProjectButton';
 import { FollowProjectButton } from '@/components/shared/FollowProjectButton';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -26,6 +27,8 @@ import {
   statusColor,
   type ProjectActivity,
 } from '@/lib/types';
+import { PartnershipInfoCard } from '@/components/workspace/PartnershipInfoCard';
+import { PartnershipLifecycleCard } from '@/components/workspace/PartnershipLifecycleCard';
 import Link from 'next/link';
 
 /* ------------------------------------------------------------------ */
@@ -375,6 +378,9 @@ export default function ProjectOverviewPage() {
           {/* Verification Summary */}
           <VerificationSummary projectId={projectId} />
 
+          {/* Project Relationships */}
+          <ProjectRelationshipCard project={p} />
+
           {/* Environmental Impact Estimates */}
           <Card className="p-6 shadow-sm border-border/60">
             <h2 className="font-display text-xl font-semibold mb-4">Estimated Environmental Impact</h2>
@@ -451,6 +457,12 @@ export default function ProjectOverviewPage() {
               </p>
             </div>
           </Card>
+
+          {/* Partnership Lifecycle */}
+          <PartnershipLifecycleCard project={p as any} />
+
+          {/* Partnership Details */}
+          <PartnershipInfoCard project={p as any} />
 
           {/* Owner Profile */}
           <Card className="p-6 shadow-sm border-border/60">

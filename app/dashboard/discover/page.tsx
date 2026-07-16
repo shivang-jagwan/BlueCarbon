@@ -45,7 +45,6 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { usePagination } from '@/hooks/use-pagination';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
-// Extend Project type for join data
 type ProjectWithProfile = Project & {
   profiles?: {
     full_name: string | null;
@@ -53,6 +52,7 @@ type ProjectWithProfile = Project & {
     state: string | null;
     district: string | null;
   } | null;
+  isPartnered: boolean;
 };
 
 export default function DiscoverPage() {
@@ -60,27 +60,38 @@ export default function DiscoverPage() {
   const router = useRouter();
   const [projects, setProjects] = React.useState<ProjectWithProfile[]>([]);
   const [loading, setLoading] = React.useState(true);
-  
-  // Search & Filters
+
   const [search, setSearch] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('all');
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [countryFilter, setCountryFilter] = React.useState('all');
-  
-  // Sorting
+
   const [sortBy, setSortBy] = React.useState('newest');
 
-  // Compare State
   const [compareIds, setCompareIds] = React.useState<string[]>([]);
-  
+
   React.useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+
+      const { data: projectsData } = await supabase
         .from('projects')
         .select('*, profiles!owner_id(full_name, organization, state, district)')
         .in('status', ['registered', 'verified', 'active', 'completed', 'in_verification']);
-      setProjects((data as ProjectWithProfile[]) || []);
+
+      const { data: activePartnerships } = await supabase
+        .from('project_partnerships')
+        .select('project_id')
+        .eq('status', 'active');
+
+      const partneredIds = new Set((activePartnerships || []).map((p: { project_id: string }) => p.project_id));
+
+      const enriched = ((projectsData as ProjectWithProfile[]) || []).map((p) => ({
+        ...p,
+        isPartnered: partneredIds.has(p.id),
+      }));
+
+      setProjects(enriched);
       setLoading(false);
     })();
   }, []);
@@ -88,21 +99,27 @@ export default function DiscoverPage() {
   const uniqueCountries = Array.from(new Set(projects.map(p => p.country).filter(Boolean))) as string[];
 
   const filtered = projects.filter((p) => {
+    if (p.isPartnered) return false;
+
+    const hasValidStatus = ['verified', 'active', 'completed'].includes(p.status);
+    const hasPassport = p.passport_issued_at !== null;
+    if (!hasValidStatus && !hasPassport) return false;
+
     const ownerName = p.profiles?.organization || p.profiles?.full_name || '';
     const state = p.profiles?.state || '';
     const district = p.profiles?.district || '';
-    
+
     const matchesSearch =
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.location_name || '').toLowerCase().includes(search.toLowerCase()) ||
       state.toLowerCase().includes(search.toLowerCase()) ||
       district.toLowerCase().includes(search.toLowerCase()) ||
       ownerName.toLowerCase().includes(search.toLowerCase());
-      
+
     const matchesType = typeFilter === 'all' || p.project_type === typeFilter;
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
     const matchesCountry = countryFilter === 'all' || p.country === countryFilter;
-    
+
     return matchesSearch && matchesType && matchesStatus && matchesCountry;
   });
 
@@ -125,10 +142,9 @@ export default function DiscoverPage() {
 
   const { page: projPage, totalPages: projTotalPages, paginatedItems: paginatedProjects, setPage: setProjPage } = usePagination(sorted, 9);
 
-  // Calculate Metrics
   const totalProjects = projects.length;
   const verifiedProjects = projects.filter(p => p.status === 'verified').length;
-  const avgCarbon = projects.length > 0 
+  const avgCarbon = projects.length > 0
     ? Math.round(projects.reduce((acc, p) => acc + (p.target_carbon_tonnes || 0), 0) / projects.length)
     : 0;
 
@@ -161,7 +177,6 @@ export default function DiscoverPage() {
         </p>
       </div>
 
-      {/* Discovery Dashboard Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4 flex flex-col justify-center bg-card shadow-sm">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -186,7 +201,6 @@ export default function DiscoverPage() {
         </Card>
       </div>
 
-      {/* Toolbar */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-card p-4 rounded-xl shadow-sm border border-border/50">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -197,7 +211,7 @@ export default function DiscoverPage() {
             className="pl-9 bg-background"
           />
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 border-r pr-3">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -220,8 +234,10 @@ export default function DiscoverPage() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="registered">Registered</SelectItem>
+                <SelectItem value="in_verification">In Verification</SelectItem>
                 <SelectItem value="verified">Verified</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
 
@@ -253,7 +269,6 @@ export default function DiscoverPage() {
         </div>
       </div>
 
-      {/* Results Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="flex flex-col items-center gap-4 text-muted-foreground">
@@ -285,10 +300,12 @@ export default function DiscoverPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {paginatedProjects.map((project) => {
             const ownerName = project.profiles?.organization || project.profiles?.full_name || 'Unknown Owner';
-            
+            const isVerifiedOrHigher = ['verified', 'active', 'completed'].includes(project.status);
+            const hasPassport = project.passport_issued_at !== null;
+            const isAvailable = !project.isPartnered;
+
             return (
               <Card key={project.id} className="group flex flex-col overflow-hidden transition-all duration-300 hover:shadow-soft-xl hover:-translate-y-1 hover:border-primary/40 border-border/60">
-                {/* Cover Image Area */}
                 <div className="relative h-48 w-full overflow-hidden bg-muted">
                   {project.cover_image_url ? (
                     <img src={project.cover_image_url} alt={project.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -297,17 +314,15 @@ export default function DiscoverPage() {
                       <Globe className="h-12 w-12 text-primary/30" />
                     </div>
                   )}
-                  
-                  {/* Overlays */}
+
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
-                  
-                  {/* Top Badges */}
+
                   <div className="absolute left-3 top-3 flex flex-wrap gap-2">
                     <Badge variant="secondary" className="bg-background/90 backdrop-blur shadow-sm font-medium">
                       {PROJECT_TYPE_LABELS[project.project_type]}
                     </Badge>
                   </div>
-                  
+
                   <div className="absolute right-3 top-3 flex flex-col gap-2 items-end">
                     {getCustomStatusBadge(project)}
                     {profile?.role === 'sustainability_partner' && (
@@ -318,10 +333,9 @@ export default function DiscoverPage() {
                     )}
                   </div>
 
-                  {/* Compare Checkbox */}
                   <div className="absolute top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 backdrop-blur rounded-full px-3 py-1.5 flex items-center gap-2 shadow-sm border border-border/50">
-                    <Checkbox 
-                      id={`compare-${project.id}`} 
+                    <Checkbox
+                      id={`compare-${project.id}`}
                       checked={compareIds.includes(project.id)}
                       onCheckedChange={() => handleCompareToggle(project.id)}
                       disabled={!compareIds.includes(project.id) && compareIds.length >= 3}
@@ -342,9 +356,8 @@ export default function DiscoverPage() {
                   </div>
                 </div>
 
-                {/* Card Body */}
                 <div className="flex flex-col flex-1 p-5 space-y-4">
-                  
+
                   <div className="flex items-start justify-between border-b border-border/50 pb-3">
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Project Owner</p>
@@ -355,6 +368,27 @@ export default function DiscoverPage() {
                         <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5 flex items-center gap-1"><HeartPulse className="h-3 w-3" /> Health</p>
                         <p className={cn("text-sm font-semibold", project.health_score > 80 ? "text-success" : project.health_score > 50 ? "text-warning" : "text-destructive")}>{project.health_score}/100</p>
                       </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {isVerifiedOrHigher && (
+                      <Badge className="bg-emerald-500 hover:bg-emerald-600 border-0 text-white text-[10px] px-2 py-0.5">
+                        Verified
+                      </Badge>
+                    )}
+                    <Badge className="bg-sky-500 hover:bg-sky-600 border-0 text-white text-[10px] px-2 py-0.5">
+                      Blue Carbon
+                    </Badge>
+                    {hasPassport && (
+                      <Badge className="bg-purple-500 hover:bg-purple-600 border-0 text-white text-[10px] px-2 py-0.5">
+                        Carbon Passport
+                      </Badge>
+                    )}
+                    {isAvailable && (
+                      <Badge className="bg-emerald-500 hover:bg-emerald-600 border-0 text-white text-[10px] px-2 py-0.5">
+                        Available
+                      </Badge>
                     )}
                   </div>
 
@@ -385,7 +419,6 @@ export default function DiscoverPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-3 pt-3 mt-auto">
                     <Button variant="outline" className="flex-1" asChild>
                       <Link href={`/dashboard/projects/${project.id}`}>
@@ -429,7 +462,6 @@ export default function DiscoverPage() {
         </>
       )}
 
-      {/* Floating Compare Bar */}
       {compareIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5">
           <div className="bg-background border border-border shadow-soft-xl rounded-full px-6 py-3 flex items-center gap-6">

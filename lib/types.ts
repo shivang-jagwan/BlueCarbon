@@ -126,6 +126,7 @@ export interface Project {
   center_lat: number | null;
   center_lng: number | null;
   bounding_box: number[] | null;
+  isPartnered: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -243,12 +244,13 @@ export type ActivityType =
   | 'audit_event'
   | 'admin_override';
 
-export type ActivityCategory = 'all' | 'documents' | 'verifications' | 'monitoring' | 'gallery' | 'comments';
+export type ActivityCategory = 'all' | 'documents' | 'verifications' | 'partnerships' | 'monitoring' | 'gallery' | 'comments';
 
 export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
   all: 'All Activity',
   documents: 'Documents',
   verifications: 'Verifications',
+  partnerships: 'Partnerships',
   monitoring: 'Monitoring',
   gallery: 'Gallery',
   comments: 'Comments',
@@ -1479,4 +1481,101 @@ export const IMMUTABLE_FIELD_LABELS: Record<string, string> = {
   survey_number: 'Survey Number',
   project_type: 'Ecosystem Type',
   created_at: 'Registration Date',
+};
+
+// ============================================================
+// FUTURE ARCHITECTURE — Mock models for future API integration
+// ============================================================
+
+export interface FutureProject {
+  id: string;
+  name: string;
+  ownerId: string;
+  verifierId: string | null;
+  partnerCompanyId: string | null;
+  carbonPassportId: string | null;
+  status: ProjectStatus;
+  partnershipStatus: PartnershipStatus | null;
+  isPartnered: boolean;
+  lastVerification: string | null;
+}
+
+export type PartnershipStatus = 
+  | 'none'
+  | 'pending_owner'
+  | 'pending_verifier'
+  | 'active'
+  | 'rejected'
+  | 'terminated';
+
+export interface PartnershipLifecycleStage {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  status: 'completed' | 'current' | 'upcoming';
+  date: string | null;
+}
+
+export interface ProjectRelationship {
+  owner: { id: string; name: string; role: string } | null;
+  verifier: { id: string; name: string; organization: string } | null;
+  partnerCompany: { id: string; name: string; partnershipDate: string } | null;
+}
+
+export interface PartnershipDetails {
+  id: string;
+  projectId: string;
+  partnerCompanyId: string;
+  partnerCompanyName: string;
+  partnershipDate: string;
+  status: PartnershipStatus;
+  projectDuration: string;
+  notes: string;
+  supportedCarbonCredits: number;
+  fundingProgress: number;
+  serviceType: string;
+  budgetUsd: number | null;
+}
+
+export interface DiscoveryProject {
+  id: string;
+  name: string;
+  status: ProjectStatus;
+  carbonPassport: boolean;
+  isPartnered: boolean;
+  ecosystem: ProjectType;
+  areaHectares: number | null;
+  targetCarbonTonnes: number | null;
+  verifiedCarbonTonnes: number | null;
+  ownerName: string;
+  locationName: string | null;
+  healthScore: number | null;
+  lastUpdated: string;
+}
+
+export const PARTNERSHIP_LIFECYCLE_STAGES: PartnershipLifecycleStage[] = [
+  { id: 'created', label: 'Project Created', description: 'Project registered on the platform', icon: 'Plus', status: 'completed', date: null },
+  { id: 'monitoring', label: 'Monitoring', description: 'Active monitoring and data collection', icon: 'Activity', status: 'completed', date: null },
+  { id: 'verification', label: 'Verification', description: 'Third-party verification process', icon: 'Shield', status: 'completed', date: null },
+  { id: 'passport', label: 'Carbon Passport Issued', description: 'Carbon credits verified and passport generated', icon: 'FileCheck', status: 'completed', date: null },
+  { id: 'discovery', label: 'Available for Discovery', description: 'Project visible in discovery directory', icon: 'Globe', status: 'completed', date: null },
+  { id: 'partnership', label: 'Partnership Established', description: 'Sustainability partner connected', icon: 'Handshake', status: 'completed', date: null },
+  { id: 'impact', label: 'Impact Monitoring', description: 'Ongoing impact measurement and reporting', icon: 'BarChart3', status: 'current', date: null },
+  { id: 'completed', label: 'Project Completed', description: 'All milestones achieved', icon: 'CheckCircle2', status: 'upcoming', date: null },
+];
+
+export const MOCK_PARTNERSHIP_DETAILS: PartnershipDetails = {
+  id: 'mock-partnership-1',
+  projectId: '',
+  partnerCompanyId: 'mock-company-1',
+  partnerCompanyName: 'Tata Steel',
+  partnershipDate: '2026-03-15',
+  status: 'active',
+  projectDuration: '5 years',
+  notes: 'Long-term partnership focused on mangrove restoration along the Gujarat coastline. Monthly monitoring reports and quarterly reviews.',
+  supportedCarbonCredits: 2500,
+  fundingProgress: 68,
+  serviceType: 'quarterly',
+  budgetUsd: 150000,
 };

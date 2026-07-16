@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 
-type NotificationType = 'verification' | 'monitoring' | 'event' | 'system' | 'passport';
+type NotificationType = 'verification' | 'monitoring' | 'event' | 'system' | 'passport' | 'partnership_request_received' | 'partnership_accepted' | 'new_verification_requested' | 'monthly_report_shared' | 'partnership_established';
 
 interface NotifyParams {
   userId: string;

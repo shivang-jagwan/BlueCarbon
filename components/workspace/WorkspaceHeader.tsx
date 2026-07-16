@@ -1,19 +1,43 @@
 'use client';
 
 import * as React from 'react';
+import {
+  Shield,
+  Building2,
+  User,
+  Leaf,
+  MapPin,
+  ShieldCheck,
+  FileText,
+  TreePine,
+  HeartPulse,
+  Eye,
+  Loader2,
+  Clock,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Loader2, MapPin, Leaf, ShieldCheck, FileText, TreePine, HeartPulse, Eye } from 'lucide-react';
 import {
   PROJECT_STATUS_LABELS,
   PROJECT_TYPE_LABELS,
   statusColor,
+  type Project,
   type ProjectStatus,
 } from '@/lib/types';
+import { supabase } from '@/lib/supabase/client';
 
 interface WorkspaceHeaderProps {
-  project: any;
+  project: Project | null;
   loading: boolean;
   role?: string;
+}
+
+interface VerifierInfo {
+  full_name: string | null;
+  organization: string | null;
+}
+
+interface PartnerInfo {
+  company_name: string;
 }
 
 function StatPill({
@@ -55,7 +79,73 @@ function StatusBadge({ label, variant }: { label: string; variant: 'success' | '
   );
 }
 
+function Divider() {
+  return <div className="hidden sm:block w-px h-4 bg-slate-200 dark:bg-slate-700" />;
+}
+
+function relativeTime(date: string) {
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 export function WorkspaceHeader({ project, loading, role }: WorkspaceHeaderProps) {
+  const [verifier, setVerifier] = React.useState<VerifierInfo | null>(null);
+  const [partner, setPartner] = React.useState<PartnerInfo | null>(null);
+  const [infoLoaded, setInfoLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!project?.id) {
+      setInfoLoaded(true);
+      return;
+    }
+
+    const loadInfo = async () => {
+      const [verifResult, partnerResult] = await Promise.all([
+        supabase
+          .from('project_partnerships')
+          .select('verifier:profiles!project_partnerships_verifier_id_fkey(full_name, organization)')
+          .eq('project_id', project.id)
+          .eq('status', 'active')
+          .not('verifier_id', 'is', null)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('project_partnerships')
+          .select('company:profiles!project_partnerships_company_id_fkey(full_name, organization)')
+          .eq('project_id', project.id)
+          .eq('status', 'active')
+          .not('company_id', 'is', null)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (verifResult.data) {
+        const v = (verifResult.data as any).verifier;
+        if (v && (v.full_name || v.organization)) {
+          setVerifier(v);
+        }
+      }
+
+      if (partnerResult.data) {
+        const c = (partnerResult.data as any).company;
+        if (c && (c.full_name || c.organization)) {
+          setPartner({
+            company_name: c.full_name || c.organization || 'Partner Company',
+          });
+        }
+      }
+
+      setInfoLoaded(true);
+    };
+
+    loadInfo();
+  }, [project?.id]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 px-6 py-3 backdrop-blur-sm">
@@ -73,92 +163,143 @@ export function WorkspaceHeader({ project, loading, role }: WorkspaceHeaderProps
     project.verification_status && project.verification_status !== 'not_submitted';
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 px-6 py-3 backdrop-blur-sm sticky top-0 z-20">
-      {/* Project name + location */}
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
-          <Leaf className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+    <div className="border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm sticky top-0 z-20">
+      {/* Row 1: Project name, status badges, stats */}
+      <div className="flex flex-wrap items-center gap-3 px-6 py-3">
+        {/* Project name + location */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+            <Leaf className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+              {project.name}
+            </h2>
+            {project.location_name && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
+                <MapPin className="h-2.5 w-2.5" />
+                {project.location_name}
+                {project.country ? `, ${project.country}` : ''}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-            {project.name}
-          </h2>
-          {project.location_name && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
-              <MapPin className="h-2.5 w-2.5" />
-              {project.location_name}
-              {project.country ? `, ${project.country}` : ''}
+
+        {/* Status badges */}
+        <div className="flex items-center gap-1.5">
+          <StatusBadge
+            label={PROJECT_STATUS_LABELS[project.status as ProjectStatus] || project.status}
+            variant={
+              project.status === 'active' || project.status === 'verified'
+                ? 'success'
+                : project.status === 'registered'
+                  ? 'muted'
+                  : 'info'
+            }
+          />
+          {hasLandVerification && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+              <ShieldCheck className="h-2.5 w-2.5" />
+              Land {project.land_verification_status}
+            </span>
+          )}
+          {hasProjectVerification && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+              <FileText className="h-2.5 w-2.5" />
+              {project.verification_status}
+            </span>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="hidden items-center gap-2 xl:flex">
+          {project.area_hectares != null && project.area_hectares > 0 && (
+            <StatPill icon={TreePine} label="Area" value={`${project.area_hectares.toFixed(1)} ha`} />
+          )}
+          {project.verified_carbon_tonnes != null && project.verified_carbon_tonnes > 0 && (
+            <StatPill
+              icon={Leaf}
+              label="Carbon"
+              value={`${project.verified_carbon_tonnes.toLocaleString()} t CO₂e`}
+            />
+          )}
+          {project.target_carbon_tonnes != null && project.target_carbon_tonnes > 0 && (
+            <StatPill
+              icon={Leaf}
+              label="Target"
+              value={`${project.target_carbon_tonnes.toLocaleString()} t`}
+            />
+          )}
+          {project.health_score != null && project.health_score > 0 && (
+            <StatPill
+              icon={HeartPulse}
+              label="Health"
+              value={`${project.health_score}/100`}
+              color={
+                project.health_score >= 70
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : project.health_score >= 40
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-600 dark:text-red-400'
+              }
+            />
+          )}
+          {role === 'sustainability_partner' && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              <Eye className="h-2.5 w-2.5" />
+              Read Only
             </span>
           )}
         </div>
       </div>
 
-      {/* Status badges */}
-      <div className="flex items-center gap-1.5">
-        <StatusBadge
-          label={PROJECT_STATUS_LABELS[project.status as ProjectStatus] || project.status}
-          variant={
-            project.status === 'active' || project.status === 'verified'
-              ? 'success'
-              : project.status === 'registered'
-                ? 'muted'
-                : 'info'
-          }
-        />
-        {hasLandVerification && (
-          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-            <ShieldCheck className="h-2.5 w-2.5" />
-            Land {project.land_verification_status}
-          </span>
-        )}
-        {hasProjectVerification && (
-          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
-            <FileText className="h-2.5 w-2.5" />
-            {project.verification_status}
-          </span>
-        )}
-      </div>
+      {/* Row 2: Info bar — Owner, Verifier, Partner, Last Updated */}
+      {infoLoaded && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-slate-100 dark:border-slate-800/60 px-6 py-2">
+          {/* Project Owner */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+            <User className="h-3.5 w-3.5 text-slate-400" />
+            <span className="font-medium">Owner</span>
+          </div>
 
-      {/* Stats */}
-      <div className="hidden items-center gap-2 xl:flex">
-        {project.area_hectares != null && project.area_hectares > 0 && (
-          <StatPill icon={TreePine} label="Area" value={`${project.area_hectares.toFixed(1)} ha`} />
-        )}
-        {project.estimated_carbon_sequestration != null && project.estimated_carbon_sequestration > 0 && (
-          <StatPill
-            icon={Leaf}
-            label="Carbon Est."
-            value={`${project.estimated_carbon_sequestration.toLocaleString()} t CO₂e`}
-          />
-        )}
-        {project.target_carbon_tonnes != null && project.target_carbon_tonnes > 0 && (
-          <StatPill
-            icon={Leaf}
-            label="Target"
-            value={`${project.target_carbon_tonnes.toLocaleString()} t`}
-          />
-        )}
-        {project.health_score != null && project.health_score > 0 && (
-          <StatPill
-            icon={HeartPulse}
-            label="Health"
-            value={`${project.health_score}/100`}
-            color={
-              project.health_score >= 70
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : project.health_score >= 40
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-red-600 dark:text-red-400'
-            }
-          />
-        )}
-        {role === 'sustainability_partner' && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-            <Eye className="h-2.5 w-2.5" />
-            Read Only
-          </span>
-        )}
-      </div>
+          {/* Assigned Verifier — only if exists */}
+          {verifier && (
+            <>
+              <Divider />
+              <div className="flex items-center gap-1.5 text-xs">
+                <Shield className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="text-slate-500 dark:text-slate-400">Verifier</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {verifier.organization || verifier.full_name}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* Partner Company — only if exists */}
+          {partner && (
+            <>
+              <Divider />
+              <div className="flex items-center gap-1.5 text-xs">
+                <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-slate-500 dark:text-slate-400">Partner</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {partner.company_name}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Last Updated */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Updated {relativeTime(project.updated_at)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

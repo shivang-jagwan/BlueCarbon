@@ -156,6 +156,17 @@ export function getCategoryEventTypes(category: string): string[] {
       'verification_organization_accepted', 'verification_organization_declined',
       'audit_event',
     ],
+    partnerships: [
+      'partnership_request_received',
+      'partnership_accepted',
+      'partnership_established',
+      'partnership_terminated',
+      'company_supported_project',
+      'company_removed_support',
+      'monitoring_partnership_created',
+      'new_verification_requested',
+      'monthly_report_shared',
+    ],
     monitoring: [
       'monitoring_report_submitted', 'monitoring_report_approved', 'monitoring_report_rejected',
       'monitoring_report_updated',
@@ -237,6 +248,14 @@ export function getEventTypeLabel(eventType: string): string {
     carbon_report_generated: 'Carbon Report Generated',
     company_supported_project: 'Sustainability Partner Joined',
     company_removed_support: 'Partnership Terminated',
+    partnership_request_received: 'Partnership Request Received',
+    partnership_accepted: 'Partnership Accepted',
+    partnership_established: 'Partnership Established',
+    partnership_terminated: 'Partnership Terminated',
+    monthly_report_shared: 'Monthly Report Shared With Partner',
+    new_verification_requested: 'New Verification Requested',
+    available_for_discovery: 'Available for Discovery',
+    project_completed: 'Project Completed',
     comments_added: 'Comment Added',
     comments_replied: 'Comment Replied',
     audit_event: 'Audit Event',
@@ -248,12 +267,14 @@ export function getEventTypeLabel(eventType: string): string {
 export function getEventCategory(eventType: string): string {
   const docEvents = ['document_submitted', 'document_verified', 'document_rejected', 'documents_requested', 'additional_documents_uploaded', 'ownership_documents_uploaded', 'ownership_documents_submitted', 'ownership_verified', 'ownership_rejected', 'evidence_uploaded', 'evidence_approved', 'evidence_rejected'];
   const verifEvents = ['land_verification_requested', 'land_verification_approved', 'land_verification_rejected', 'project_verification_requested', 'project_verification_approved', 'project_verification_rejected', 'verification_requested', 'verification_approved', 'verification_rejected', 'verification_started', 'verifier_assigned', 'verification_organization_accepted', 'verification_organization_declined', 'audit_event'];
-  const monEvents = ['monitoring_report_submitted', 'monitoring_report_approved', 'monitoring_report_rejected', 'monitoring_report_updated', 'monitoring_partnership_created', 'satellite_report_generated', 'drone_images_uploaded', 'drone_videos_uploaded'];
+  const partnerEvents = ['partnership_request_received', 'partnership_accepted', 'partnership_established', 'partnership_terminated', 'company_supported_project', 'company_removed_support', 'monitoring_partnership_created', 'new_verification_requested', 'monthly_report_shared'];
+  const monEvents = ['monitoring_report_submitted', 'monitoring_report_approved', 'monitoring_report_rejected', 'monitoring_report_updated', 'satellite_report_generated', 'drone_images_uploaded', 'drone_videos_uploaded'];
   const galleryEvents = ['gallery_photos_uploaded', 'gallery_videos_uploaded', 'satellite_report_generated'];
   const commentEvents = ['comments_added', 'comments_replied'];
 
   if (docEvents.includes(eventType)) return 'documents';
   if (verifEvents.includes(eventType)) return 'verifications';
+  if (partnerEvents.includes(eventType)) return 'partnerships';
   if (monEvents.includes(eventType)) return 'monitoring';
   if (galleryEvents.includes(eventType)) return 'gallery';
   if (commentEvents.includes(eventType)) return 'comments';

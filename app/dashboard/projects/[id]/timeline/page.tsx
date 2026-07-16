@@ -60,12 +60,14 @@ import {
   CalendarDays,
   TrendingUp,
   AlertTriangle,
+  Globe,
 } from 'lucide-react';
 
 const TABS: { value: ActivityCategory; label: string; icon: React.ElementType }[] = [
   { value: 'all', label: 'All Activity', icon: History },
   { value: 'documents', label: 'Documents', icon: FileText },
   { value: 'verifications', label: 'Verifications', icon: Shield },
+  { value: 'partnerships', label: 'Partnerships', icon: Handshake },
   { value: 'monitoring', label: 'Monitoring', icon: BarChart3 },
   { value: 'gallery', label: 'Gallery', icon: Image },
   { value: 'comments', label: 'Comments', icon: MessageSquare },
@@ -128,6 +130,15 @@ const EVENT_ICON_MAP: Record<string, React.ElementType> = {
   company_supported_project: DollarSign,
   company_removed_support: AlertCircle,
 
+  partnership_request_received: Handshake,
+  partnership_accepted: CheckCircle2,
+  partnership_established: Handshake,
+  partnership_terminated: XCircle,
+  monthly_report_shared: FileText,
+  new_verification_requested: Shield,
+  available_for_discovery: Globe,
+  project_completed: CheckCircle2,
+
   comments_added: MessageSquare,
   comments_replied: MessageSquare,
 
@@ -136,6 +147,14 @@ const EVENT_ICON_MAP: Record<string, React.ElementType> = {
 };
 
 function getEventColor(eventType: string): { bg: string; text: string; ring: string; border: string } {
+  if (eventType.includes('partnership_established') || eventType.includes('partnership_accepted')) return { bg: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', ring: 'ring-emerald-500/20', border: 'border-emerald-200 dark:border-emerald-800' };
+  if (eventType.includes('partnership_request')) return { bg: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/20', border: 'border-blue-200 dark:border-blue-800' };
+  if (eventType.includes('partnership_terminated')) return { bg: 'bg-red-500', text: 'text-red-700 dark:text-red-400', ring: 'ring-red-500/20', border: 'border-red-200 dark:border-red-800' };
+  if (eventType.includes('monthly_report')) return { bg: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', ring: 'ring-indigo-500/20', border: 'border-indigo-200 dark:border-indigo-800' };
+  if (eventType.includes('carbon_passport')) return { bg: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', ring: 'ring-purple-500/20', border: 'border-purple-200 dark:border-purple-800' };
+  if (eventType.includes('available_for_discovery')) return { bg: 'bg-teal-500', text: 'text-teal-700 dark:text-teal-400', ring: 'ring-teal-500/20', border: 'border-teal-200 dark:border-teal-800' };
+  if (eventType.includes('project_completed')) return { bg: 'bg-green-500', text: 'text-green-700 dark:text-green-400', ring: 'ring-green-500/20', border: 'border-green-200 dark:border-green-800' };
+
   const approved = eventType.includes('approved') || eventType.includes('accepted') || eventType.includes('issued') || eventType === 'project_created';
   const rejected = eventType.includes('rejected') || eventType.includes('revoked') || eventType.includes('declined');
   const pending = eventType.includes('requested') || eventType.includes('submitted') || eventType.includes('pending') || eventType.includes('started');
@@ -392,7 +411,7 @@ export default function TimelinePage() {
   }, [activities]);
 
   const tabCounts = React.useMemo(() => {
-    return { all: totalCount, documents: totalCount, verifications: totalCount, monitoring: totalCount, gallery: totalCount, comments: totalCount };
+    return { all: totalCount, documents: totalCount, verifications: totalCount, partnerships: totalCount, monitoring: totalCount, gallery: totalCount, comments: totalCount };
   }, [totalCount]);
 
   const activeFilterCount = React.useMemo(() => {
