@@ -77,7 +77,6 @@ const ADDITIONAL_DOC_CATEGORIES: { value: SnapshotDocumentCategory; label: strin
   { value: 'land_ownership', label: 'Land Ownership' },
   { value: 'government_approval', label: 'Government Approval' },
   { value: 'environmental_clearance', label: 'Environmental Clearance' },
-  { value: 'supporting_files', label: 'Supporting Files' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -833,12 +832,13 @@ export default function VerificationSubmitPage() {
         .insert({
           project_id: projectId,
           uploaded_by: profile.id,
-          name: name,
+          document_name: name,
           category: category,
-          file_type: fileType,
+          file_name: file.name,
           storage_path: filePath,
           file_size: file.size,
           mime_type: file.type,
+          status: 'uploaded',
         })
         .select()
         .single();
