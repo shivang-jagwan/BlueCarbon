@@ -499,6 +499,7 @@ function UploadDocumentDialog({
   const [file, setFile] = React.useState<File | null>(null);
   const [uploading, setUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { profile } = useAuth();
 
   const handleUpload = async () => {
     if (!category) {
@@ -532,6 +533,7 @@ function UploadDocumentDialog({
         .from('project_documents_v2')
         .insert({
           project_id: projectId,
+          uploaded_by: profile?.id || '',
           category,
           document_name: documentName.trim(),
           description: description.trim() || null,

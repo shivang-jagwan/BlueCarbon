@@ -294,7 +294,7 @@ export default function VerificationCenterPage() {
       const [reqResult, histResult, partResult] = await Promise.all([
         supabase
           .from('verification_service_requests')
-          .select('*, profiles!verification_service_requests_verifier_id_fkey(full_name, organization)')
+          .select('*, profiles!verification_requests_verifier_id_fkey(full_name, organization)')
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
         supabase

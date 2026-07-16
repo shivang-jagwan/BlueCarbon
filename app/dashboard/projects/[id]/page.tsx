@@ -67,7 +67,7 @@ function VerificationSummary({ projectId }: { projectId: string }) {
     Promise.all([
       supabase
         .from('verification_service_requests')
-        .select('request_type, status, verifier_id, profiles!verification_service_requests_verifier_id_fkey(full_name, organization)')
+        .select('request_type, status, verifier_id, profiles!verification_requests_verifier_id_fkey(full_name, organization)')
         .eq('project_id', projectId),
       supabase
         .from('project_partnerships')
