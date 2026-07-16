@@ -1,233 +1,284 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
-import { useAuth } from '@/components/providers/auth-provider';
-import { useVerificationRequests } from '@/hooks/use-projects';
-import { supabase } from '@/lib/supabase/client';
-import { toast } from 'sonner';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
-  ShieldCheck,
-  Map,
   ClipboardCheck,
-  Building2,
-  CalendarDays,
-  Clock,
+  Eye,
+  CalendarClock,
+  CheckCircle2,
+  RotateCcw,
+  XCircle,
   ArrowRight,
-  Filter,
-  Inbox,
+  Clock,
+  Shield,
+  FileText,
 } from 'lucide-react';
-import {
-  VERIFICATION_REQUEST_TYPE_LABELS,
-  VERIF_REQUEST_STATUS_LABELS,
-  verificationStatusColor,
-  priorityColor,
-  type VerificationRequestType,
-} from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { getApplications, getApplicationsByStatus } from '@/lib/voc-services';
+import {
+  APPLICATION_STATUS_LABELS,
+  APPLICATION_STATUS_COLORS,
+  type VerificationApplication,
+  type ApplicationStatus,
+} from '@/lib/voc-types';
 
-const TYPE_ICONS: Record<VerificationRequestType, React.ElementType> = {
-  land: Map,
-  project: ClipboardCheck,
-  corporate: Building2,
-  monthly: CalendarDays,
-};
-
-const TYPE_FILTERS = [
-  { id: 'all', label: 'All Requests', icon: Inbox },
-  { id: 'land', label: 'Land Verification', icon: Map },
-  { id: 'project', label: 'Project Verification', icon: ClipboardCheck },
-  { id: 'corporate', label: 'Corporate Verification', icon: Building2 },
-  { id: 'monthly', label: 'Monthly Monitoring', icon: CalendarDays },
+const KPI_CARDS = [
+  { label: 'Pending', icon: ClipboardCheck, color: 'text-blue-600', bg: 'bg-blue-50', status: 'submitted' as const },
+  { label: 'Under Review', icon: Eye, color: 'text-indigo-600', bg: 'bg-indigo-50', status: 'under_review' as const },
+  { label: 'Audit Scheduled', icon: CalendarClock, color: 'text-purple-600', bg: 'bg-purple-50', status: 'audit_scheduled' as const },
+  { label: 'Approved', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', status: 'approved' as const },
+  { label: 'Returned', icon: RotateCcw, color: 'text-amber-600', bg: 'bg-amber-50', status: 'returned_for_revision' as const },
+  { label: 'Rejected', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', status: 'rejected' as const },
 ];
 
-const STATUS_FILTERS = ['all', 'pending', 'in_review', 'approved', 'rejected', 'changes_requested'];
+const ACTIVE_STATUSES: ApplicationStatus[] = [
+  'submitted',
+  'under_review',
+  'audit_scheduled',
+  'audit_completed',
+];
 
-export default function VerificationCenterPage() {
-  const { user } = useAuth();
-  const { requests, loading, refetch } = useVerificationRequests(user?.id ?? null);
-  const [typeFilter, setTypeFilter] = React.useState('all');
-  const [statusFilter, setStatusFilter] = React.useState('all');
+export default function VOCDashboardPage() {
+  const router = useRouter();
+  const [applications] = React.useState<VerificationApplication[]>(getApplications());
 
-  const filtered = requests.filter((r) => {
-    const matchesType = typeFilter === 'all' || r.request_type === typeFilter;
-    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
-    return matchesType && matchesStatus;
-  });
+  const counts = React.useMemo(() => {
+    const c: Record<string, number> = {};
+    KPI_CARDS.forEach((k) => {
+      c[k.status] = getApplicationsByStatus(k.status).length;
+    });
+    return c;
+  }, []);
 
-  const handleStatusUpdate = async (requestId: string, status: string) => {
-    try {
-      const { error } = await supabase
-        .from('verification_service_requests')
-        .update({ status })
-        .eq('id', requestId);
-      if (error) throw error;
-      toast.success(`Marked as ${status.replace('_', ' ')}`);
-      refetch();
-    } catch (err) {
-      toast.error('Failed to update status');
-    }
-  };
+  const activeApplications = applications.filter((a) =>
+    ACTIVE_STATUSES.includes(a.status)
+  );
+
+  const totalActive = activeApplications.length;
+  const totalCompleted = applications.filter((a) =>
+    ['approved', 'returned_for_revision', 'rejected'].includes(a.status)
+  ).length;
+  const approvalRate =
+    totalCompleted > 0
+      ? Math.round(
+          (counts['approved'] / totalCompleted) * 100
+        )
+      : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Center</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Unified inbox for all verification requests — land, project, corporate, and monthly monitoring
-        </p>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <Shield className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">
+              Verification Operations Center
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Review applications, manage audits, and issue verification
+              decisions.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Type Filters */}
-      <div className="flex flex-wrap gap-2">
-        {TYPE_FILTERS.map((filter) => {
-          const Icon = filter.icon;
-          const isActive = typeFilter === filter.id;
-          const count = filter.id === 'all'
-            ? requests.length
-            : requests.filter((r) => r.request_type === filter.id).length;
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        {KPI_CARDS.map((kpi) => {
+          const Icon = kpi.icon;
           return (
-            <button
-              key={filter.id}
-              onClick={() => setTypeFilter(filter.id)}
-              className={cn(
-                'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              )}
+            <Card
+              key={kpi.status}
+              className="shadow-sm hover:shadow-md transition-shadow"
             >
-              <Icon className="h-3.5 w-3.5" />
-              {filter.label}
-              <span className={cn(
-                'rounded-full px-1.5 py-0.5 text-xs',
-                isActive ? 'bg-primary/20' : 'bg-muted'
-              )}>
-                {count}
-              </span>
-            </button>
+              <CardContent className="p-4">
+                <div
+                  className={cn(
+                    'flex h-9 w-9 items-center justify-center rounded-lg mb-3',
+                    kpi.bg
+                  )}
+                >
+                  <Icon className={cn('h-4 w-4', kpi.color)} />
+                </div>
+                <p className="text-2xl font-bold font-display">
+                  {counts[kpi.status] || 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {kpi.label}
+                </p>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
 
-      {/* Status Filters */}
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <div className="flex flex-wrap gap-1.5">
-          {STATUS_FILTERS.map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={cn(
-                'rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors',
-                statusFilter === status
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {status.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Requests List */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Clock className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-          <ShieldCheck className="h-10 w-10 text-muted-foreground/40" />
-          <div>
-            <h3 className="font-semibold">No verification requests</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {typeFilter !== 'all' || statusFilter !== 'all'
-                ? 'Try adjusting your filters'
-                : 'New requests will appear here when projects are assigned'}
-            </p>
-          </div>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((req) => {
-            const TypeIcon = TYPE_ICONS[req.request_type];
-            return (
-              <Card key={req.id} className="p-4 transition-all hover:shadow-soft">
-                <div className="flex items-start gap-4">
-                  {/* Priority indicator */}
-                  <div className="flex flex-col items-center gap-1 pt-1">
-                    <div className={cn('h-3 w-3 rounded-full', priorityColor(req.priority))} />
-                    <span className="text-[10px] font-medium text-muted-foreground capitalize">
-                      {req.priority}
-                    </span>
-                  </div>
-
-                  {/* Type icon */}
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <TypeIcon className="h-5 w-5" />
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold leading-tight">
-                          {(req as any).projects?.name || 'Project Verification'}
-                        </h3>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {VERIFICATION_REQUEST_TYPE_LABELS[req.request_type]} Request
-                        </p>
-                        {req.description && (
-                          <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{req.description}</p>
+      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">
+                Active Applications
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  router.push('/dashboard/verification/applications')
+                }
+              >
+                View All{' '}
+                <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {activeApplications.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <CheckCircle2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">
+                  No active applications. All caught up!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activeApplications.slice(0, 5).map((app) => (
+                  <div
+                    key={app.id}
+                    className="flex items-center gap-4 p-3 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/verification/workspace/${app.id}`
+                      )
+                    }
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {app.application_number}
+                        </span>
+                        {app.field_audit_required === 'yes' && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            Field Audit
+                          </Badge>
                         )}
                       </div>
-                      <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap', verificationStatusColor(req.status))}>
-                        {VERIF_REQUEST_STATUS_LABELS[req.status]}
-                      </span>
+                      <p className="text-sm font-medium truncate mt-0.5">
+                        {app.project_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {app.ngo_name} — {app.project_owner_name}
+                      </p>
                     </div>
-
-                    <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>Created {new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                      {req.due_date && (
-                        <span className={cn(
-                          'flex items-center gap-1',
-                          new Date(req.due_date) < new Date() && 'text-destructive font-medium'
-                        )}>
-                          <Clock className="h-3 w-3" />
-                          Due {new Date(req.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="mt-3 flex items-center gap-2">
-                      <Button asChild size="sm" variant="default">
-                        <Link href={`/dashboard/projects/${req.project_id}`}>
-                          Open Project
-                          <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
-                      {req.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStatusUpdate(req.id, 'in_review')}
-                        >
-                          Start Review
-                        </Button>
-                      )}
+                    <div className="text-right shrink-0">
+                      <Badge
+                        className={cn(
+                          'text-[10px]',
+                          APPLICATION_STATUS_COLORS[app.status]
+                        )}
+                      >
+                        {APPLICATION_STATUS_LABELS[app.status]}
+                      </Badge>
+                      <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 justify-end">
+                        <Clock className="h-3 w-3" />
+                        {new Date(
+                          app.submitted_date
+                        ).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">
+                Quick Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Total Applications
+                </span>
+                <span className="text-sm font-semibold">
+                  {applications.length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Active
+                </span>
+                <span className="text-sm font-semibold">
+                  {totalActive}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Completed
+                </span>
+                <span className="text-sm font-semibold">
+                  {totalCompleted}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Approval Rate
+                </span>
+                <span className="text-sm font-semibold">
+                  {approvalRate}%
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="text-xs text-muted-foreground">
+                    Pending: {counts['submitted'] || 0}
+                  </span>
                 </div>
-              </Card>
-            );
-          })}
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-indigo-500" />
+                  <span className="text-xs text-muted-foreground">
+                    Under Review: {counts['under_review'] || 0}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-purple-500" />
+                  <span className="text-xs text-muted-foreground">
+                    Audit Scheduled: {counts['audit_scheduled'] || 0}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-cyan-500" />
+                  <span className="text-xs text-muted-foreground">
+                    Audit Completed:{' '}
+                    {counts['audit_completed'] || 0}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
+      </div>
     </div>
   );
 }

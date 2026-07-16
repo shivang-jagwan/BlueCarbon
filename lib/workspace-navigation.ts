@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   History,
-  Landmark,
   ShieldCheck,
   FileText,
   Image,
@@ -9,7 +8,6 @@ import {
   BarChart3,
   Award,
   Settings,
-  Map,
   Eye,
   FolderOpen,
   CheckCircle2,
@@ -23,6 +21,7 @@ import {
   Building2,
   Download,
   FileBarChart,
+  Send,
   type LucideIcon,
 } from 'lucide-react';
 import type { AppRole } from '@/lib/types';
@@ -46,14 +45,13 @@ export const OWNER_WORKSPACE_NAV: WorkspaceNavSection[] = [
     items: [
       { label: 'Overview', href: '', icon: LayoutDashboard },
       { label: 'Project History', href: '/timeline', icon: History },
-      { label: 'Land Ownership', href: '/land-ownership', icon: Landmark },
     ],
   },
   {
     title: 'Verification',
     items: [
-      { label: 'Verification Center', href: '/verification', icon: ShieldCheck },
-      { label: 'Documents', href: '/documents', icon: FileText },
+      { label: 'Submit Application', href: '/verification', icon: Send },
+      { label: 'Official Records', href: '/official-records', icon: Award },
     ],
   },
   {
@@ -75,35 +73,24 @@ export const OWNER_WORKSPACE_NAV: WorkspaceNavSection[] = [
 
 export const VERIFIER_WORKSPACE_NAV: WorkspaceNavSection[] = [
   {
-    title: 'Project',
+    title: 'VOC',
     items: [
-      { label: 'Overview', href: '', icon: LayoutDashboard },
-      { label: 'Project History', href: '/timeline', icon: History },
+      { label: 'VOC Dashboard', href: '/dashboard/verification', icon: ShieldCheck },
+      { label: 'Applications', href: '/dashboard/verification/applications', icon: FileText },
     ],
   },
   {
-    title: 'Verification',
+    title: 'Workspace',
     items: [
-      { label: 'Verification Tasks', href: '/verification', icon: CheckCircle2 },
-      { label: 'Evidence Review', href: '/evidence', icon: Eye },
-      { label: 'Documents', href: '/documents', icon: FileText },
-      { label: 'Land Ownership', href: '/land-ownership', icon: Landmark },
+      { label: 'History', href: '/dashboard/verification/history', icon: History },
+      { label: 'Official Records', href: '/dashboard/verification/official-records', icon: Award },
+      { label: 'Calendar', href: '/dashboard/verification/calendar', icon: Calendar },
     ],
   },
   {
-    title: 'Monitoring',
+    title: 'Analytics',
     items: [
-      { label: 'Monitoring Reports', href: '/monitoring', icon: ClipboardList },
-      { label: 'AI Analysis', href: '/ai-review', icon: Sparkles },
-      { label: 'Reports', href: '/reports', icon: BarChart3 },
-    ],
-  },
-  {
-    title: 'Settings',
-    items: [
-      { label: 'Decision', href: '/decision', icon: Gavel },
-      { label: 'Discussion', href: '/discussion', icon: MessageSquare },
-      { label: 'Carbon Passport', href: '/passport', icon: Award },
+      { label: 'Analytics', href: '/dashboard/verification/analytics', icon: BarChart3 },
     ],
   },
 ];

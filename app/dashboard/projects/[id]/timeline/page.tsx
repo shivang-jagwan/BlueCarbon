@@ -144,6 +144,14 @@ const EVENT_ICON_MAP: Record<string, React.ElementType> = {
 
   audit_event: Lock,
   admin_override: Zap,
+
+  verification_application_submitted: Send,
+  verification_application_under_review: Eye,
+  verification_audit_scheduled: Calendar,
+  verification_audit_completed: CheckCircle2,
+  verification_application_approved: CheckCircle2,
+  verification_application_returned: RefreshCw,
+  verification_application_rejected: XCircle,
 };
 
 function getEventColor(eventType: string): { bg: string; text: string; ring: string; border: string } {
@@ -152,6 +160,7 @@ function getEventColor(eventType: string): { bg: string; text: string; ring: str
   if (eventType.includes('partnership_terminated')) return { bg: 'bg-red-500', text: 'text-red-700 dark:text-red-400', ring: 'ring-red-500/20', border: 'border-red-200 dark:border-red-800' };
   if (eventType.includes('monthly_report')) return { bg: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', ring: 'ring-indigo-500/20', border: 'border-indigo-200 dark:border-indigo-800' };
   if (eventType.includes('carbon_passport')) return { bg: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', ring: 'ring-purple-500/20', border: 'border-purple-200 dark:border-purple-800' };
+  if (eventType.includes('verification_application') || eventType.includes('verification_audit')) return { bg: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', ring: 'ring-indigo-500/20', border: 'border-indigo-200 dark:border-indigo-800' };
   if (eventType.includes('available_for_discovery')) return { bg: 'bg-teal-500', text: 'text-teal-700 dark:text-teal-400', ring: 'ring-teal-500/20', border: 'border-teal-200 dark:border-teal-800' };
   if (eventType.includes('project_completed')) return { bg: 'bg-green-500', text: 'text-green-700 dark:text-green-400', ring: 'ring-green-500/20', border: 'border-green-200 dark:border-green-800' };
 

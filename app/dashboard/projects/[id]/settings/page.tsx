@@ -19,6 +19,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Globe,
   Bell,
   Lock,
@@ -29,6 +40,7 @@ import {
   Upload,
   ImageIcon,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { PROJECT_TYPE_LABELS, type ProjectType } from '@/lib/types';
 
@@ -38,6 +50,7 @@ export default function ProjectSettingsPage() {
   const router = useRouter();
   const { project, loading } = useProject(projectId);
   const [saving, setSaving] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
@@ -151,6 +164,23 @@ export default function ProjectSettingsPage() {
       toast.success('Cover image removed');
     } catch (err) {
       toast.error('Failed to remove cover image');
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to delete project');
+      }
+      toast.success('Project deleted');
+      router.push('/dashboard/projects');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete project');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -328,7 +358,7 @@ export default function ProjectSettingsPage() {
           <Lock className="h-4.5 w-4.5 text-destructive" />
           <h2 className="font-semibold text-destructive">Danger Zone</h2>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Archive Project</p>
@@ -338,6 +368,67 @@ export default function ProjectSettingsPage() {
               <Archive className="mr-2 h-4 w-4" />
               Archive
             </Button>
+          </div>
+          <div className="border-t border-destructive/10 pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Delete Project</p>
+                <p className="text-xs text-muted-foreground">
+                  Permanently delete this project and all its data, including verifiers, partnerships, documents, and evidence. This cannot be undone.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={deleting}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                      Delete Project
+                    </AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="text-sm text-muted-foreground">
+                        <p>
+                          This will permanently delete <strong>{project.name}</strong> and all associated data:
+                        </p>
+                        <ul className="mt-2 list-disc pl-5 space-y-1">
+                          <li>All documents and evidence files</li>
+                          <li>Verifier connections and verification history</li>
+                          <li>Partner company relationships</li>
+                          <li>Carbon passport and monitoring reports</li>
+                          <li>Calendar events and discussion comments</li>
+                        </ul>
+                        <p className="mt-3 text-destructive font-medium">This action cannot be undone.</p>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Project
+                        </>
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </Card>

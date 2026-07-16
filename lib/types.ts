@@ -242,7 +242,14 @@ export type ActivityType =
   | 'comments_added'
   | 'comments_replied'
   | 'audit_event'
-  | 'admin_override';
+  | 'admin_override'
+  | 'verification_application_submitted'
+  | 'verification_application_under_review'
+  | 'verification_audit_scheduled'
+  | 'verification_audit_completed'
+  | 'verification_application_approved'
+  | 'verification_application_returned'
+  | 'verification_application_rejected';
 
 export type ActivityCategory = 'all' | 'documents' | 'verifications' | 'partnerships' | 'monitoring' | 'gallery' | 'comments';
 
@@ -1564,18 +1571,3 @@ export const PARTNERSHIP_LIFECYCLE_STAGES: PartnershipLifecycleStage[] = [
   { id: 'impact', label: 'Impact Monitoring', description: 'Ongoing impact measurement and reporting', icon: 'BarChart3', status: 'current', date: null },
   { id: 'completed', label: 'Project Completed', description: 'All milestones achieved', icon: 'CheckCircle2', status: 'upcoming', date: null },
 ];
-
-export const MOCK_PARTNERSHIP_DETAILS: PartnershipDetails = {
-  id: 'mock-partnership-1',
-  projectId: '',
-  partnerCompanyId: 'mock-company-1',
-  partnerCompanyName: 'Tata Steel',
-  partnershipDate: '2026-03-15',
-  status: 'active',
-  projectDuration: '5 years',
-  notes: 'Long-term partnership focused on mangrove restoration along the Gujarat coastline. Monthly monitoring reports and quarterly reviews.',
-  supportedCarbonCredits: 2500,
-  fundingProgress: 68,
-  serviceType: 'quarterly',
-  budgetUsd: 150000,
-};

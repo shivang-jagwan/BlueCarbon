@@ -86,7 +86,7 @@ export default function OwnerDashboard() {
             </div>
           )}
         </div>
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <UpcomingEventsWidget />
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">

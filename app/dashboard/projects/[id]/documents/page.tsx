@@ -51,8 +51,10 @@ import {
   CheckCircle2,
   File,
   X,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getActiveApplicationForProject } from '@/lib/voc-services';
 
 const CATEGORIES: DocumentCategory[] = [
   'land_ownership',
@@ -75,6 +77,8 @@ export default function DocumentsPage() {
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { profile } = useAuth();
+  const activeApp = React.useMemo(() => getActiveApplicationForProject(projectId), [projectId]);
+  const isLocked = !!activeApp;
 
   const [documents, setDocuments] = React.useState<ProjectDocumentV2[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -138,6 +142,16 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6">
+      {isLocked && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+          <Lock className="h-5 w-5 text-amber-600 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Documents are locked</p>
+            <p className="text-xs text-amber-600">Verification Application {activeApp?.application_number} is under review. Upload, delete, and replace are disabled.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-xl font-semibold">Project Documents</h1>
@@ -147,7 +161,7 @@ export default function DocumentsPage() {
         </div>
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-green-600 hover:bg-green-700 text-white">
+            <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={isLocked}>
               <Upload className="mr-2 h-4 w-4" />
               Upload Document
             </Button>

@@ -86,15 +86,15 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-1">
+        <div className="mb-2 grid grid-cols-7 gap-0.5">
           {DAYS.map((day) => (
-            <div key={day} className="py-2 text-center text-xs font-medium text-muted-foreground">
+            <div key={day} className="py-1 text-center text-[10px] font-medium text-muted-foreground">
               {day}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0.5">
           {days.map((day, i) => {
             const isToday = day === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear();
             
@@ -109,27 +109,46 @@ export default function CalendarPage() {
                 key={i}
                 onClick={() => day && handleDayClick(day)}
                 className={cn(
-                  'min-h-[100px] rounded-lg border p-1.5 text-sm transition-colors',
+                  'min-h-[52px] rounded-md border p-1 text-xs transition-colors',
                   day ? 'border-border cursor-pointer hover:bg-muted/30' : 'border-transparent cursor-default',
                   isToday && 'border-primary bg-primary/5 hover:bg-primary/10'
                 )}
               >
                 {day && (
                   <>
-                    <span className={cn('text-xs font-medium', isToday && 'text-primary')}>{day}</span>
-                    <div className="mt-1 space-y-0.5">
-                      {dayEvents.map((event) => (
+                    <span className={cn('text-[10px] font-medium', isToday && 'text-primary')}>{day}</span>
+                    <div className="mt-0.5 space-y-px">
+                      {dayEvents.length > 0 && dayEvents.length <= 2 && dayEvents.map((event) => (
                         <div
                           key={event.id}
                           onClick={(e) => handleEventClick(e, event)}
-                          className="flex items-center gap-1.5 rounded px-1.5 py-1 text-[10px] hover:bg-accent/80 transition-colors"
+                          className="flex items-center gap-1 rounded px-1 py-px text-[9px] hover:bg-accent/80 transition-colors"
                         >
-                          <div className={cn('h-2 w-2 shrink-0 rounded-full', EVENT_COLORS[event.event_type] || EVENT_COLORS.custom)} />
+                          <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', EVENT_COLORS[event.event_type] || EVENT_COLORS.custom)} />
                           <span className={cn('truncate', event.status === 'completed' && 'line-through opacity-60')}>
                             {event.title}
                           </span>
                         </div>
                       ))}
+                      {dayEvents.length > 2 && (
+                        <>
+                          {dayEvents.slice(0, 1).map((event) => (
+                            <div
+                              key={event.id}
+                              onClick={(e) => handleEventClick(e, event)}
+                              className="flex items-center gap-1 rounded px-1 py-px text-[9px] hover:bg-accent/80 transition-colors"
+                            >
+                              <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', EVENT_COLORS[event.event_type] || EVENT_COLORS.custom)} />
+                              <span className={cn('truncate', event.status === 'completed' && 'line-through opacity-60')}>
+                                {event.title}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="px-1 py-px text-[9px] text-muted-foreground font-medium">
+                            +{dayEvents.length - 1} more
+                          </div>
+                        </>
+                      )}
                     </div>
                   </>
                 )}

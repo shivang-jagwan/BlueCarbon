@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Source, Layer, MapRef, MapMouseEvent } from 'react-map-gl/maplibre';
+import { Source, Layer, MapRef } from 'react-map-gl/maplibre';
+import type { MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import * as turf from '@turf/turf';
 import { MapViewer } from './MapViewer';
 import { MapToolbar } from './MapToolbar';
@@ -78,7 +79,7 @@ export function BoundaryEditor({ geojson, onChange, height = '500px' }: Boundary
     }
   }, [onChange]);
 
-  const handleMapClick = (e: MapMouseEvent) => {
+  const handleMapClick = (e: MapLayerMouseEvent) => {
     if (mode !== 'draw') return;
     
     const newPoint = [e.lngLat.lng, e.lngLat.lat];
@@ -87,7 +88,7 @@ export function BoundaryEditor({ geojson, onChange, height = '500px' }: Boundary
     updateParent(newPoints);
   };
 
-  const handleMouseMove = (e: MapMouseEvent) => {
+  const handleMouseMove = (e: MapLayerMouseEvent) => {
     setCursorPos({ lat: e.lngLat.lat, lng: e.lngLat.lng });
   };
 
@@ -163,7 +164,7 @@ export function BoundaryEditor({ geojson, onChange, height = '500px' }: Boundary
           onMouseMove={handleMouseMove}
         >
           {displayGeojson && (
-            <Source type="geojson" data={displayGeojson as any}>
+            <Source key={`boundary-${points.length}`} id="project-boundary" type="geojson" data={displayGeojson as any}>
               <Layer 
                 id="boundary-fill" 
                 type="fill" 

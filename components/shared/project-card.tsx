@@ -18,9 +18,7 @@ import {
   Ruler,
   Globe,
   Clock,
-  Settings,
   ExternalLink,
-  FileText,
   Layers,
   CircleDot,
   HelpCircle,
@@ -249,37 +247,16 @@ export function ProjectCard({ project, href, ownerName }: ProjectCardProps) {
             {/* Separator */}
             <div className="border-t border-slate-100 dark:border-slate-800" />
 
-            {/* Row 11: Footer Buttons */}
-            <div className="flex items-center gap-2 pt-0.5">
+            {/* Row 11: Footer Button */}
+            <div className="pt-0.5">
               <Button
                 asChild
                 size="sm"
-                className="h-8 flex-1 bg-green-600 text-white hover:bg-green-700 text-xs font-medium"
+                className="h-8 w-full bg-green-600 text-white hover:bg-green-700 text-xs font-medium"
               >
                 <span>
                   <ExternalLink className="mr-1.5 h-3 w-3" />
                   Workspace
-                </span>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="h-8 flex-1 border-slate-200 text-xs font-medium dark:border-slate-700"
-              >
-                <span>
-                  <FileText className="mr-1.5 h-3 w-3" />
-                  Details
-                </span>
-              </Button>
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs font-medium"
-              >
-                <span>
-                  <Settings className="h-3.5 w-3.5" />
                 </span>
               </Button>
             </div>

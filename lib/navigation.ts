@@ -73,7 +73,7 @@ export const VERIFIER_NAV: NavSection[] = [
     title: 'Main',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Verification Center', href: '/dashboard/verification', icon: ShieldCheck },
+      { label: 'Verification Operations Center', href: '/dashboard/verification', icon: ShieldCheck },
       { label: 'Monitoring Projects', href: '/dashboard/projects', icon: FolderKanban },
     ],
   },
