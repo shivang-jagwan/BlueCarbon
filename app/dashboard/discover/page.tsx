@@ -98,13 +98,20 @@ export default function DiscoverPage() {
 
   const uniqueCountries = Array.from(new Set(projects.map(p => p.country).filter(Boolean))) as string[];
 
-  const filtered = projects.filter((p) => {
-    if (p.isPartnered) return false;
+  // Single reusable discovery filter — used by stats, cards, search, and map
+  const discoverableProjects = React.useMemo(() => {
+    return projects.filter((p) => {
+      if (p.isPartnered) return false;
 
-    const hasValidStatus = ['verified', 'active', 'completed'].includes(p.status);
-    const hasPassport = p.passport_issued_at !== null;
-    if (!hasValidStatus && !hasPassport) return false;
+      const hasValidStatus = ['verified', 'active', 'completed'].includes(p.status);
+      const hasPassport = p.passport_issued_at !== null;
+      if (!hasValidStatus && !hasPassport) return false;
 
+      return true;
+    });
+  }, [projects]);
+
+  const filtered = discoverableProjects.filter((p) => {
     const ownerName = p.profiles?.organization || p.profiles?.full_name || '';
     const state = p.profiles?.state || '';
     const district = p.profiles?.district || '';
@@ -142,10 +149,10 @@ export default function DiscoverPage() {
 
   const { page: projPage, totalPages: projTotalPages, paginatedItems: paginatedProjects, setPage: setProjPage } = usePagination(sorted, 9);
 
-  const totalProjects = projects.length;
-  const verifiedProjects = projects.filter(p => p.status === 'verified').length;
-  const avgCarbon = projects.length > 0
-    ? Math.round(projects.reduce((acc, p) => acc + (p.target_carbon_tonnes || 0), 0) / projects.length)
+  const totalProjects = discoverableProjects.length;
+  const verifiedProjects = discoverableProjects.filter(p => p.status === 'verified').length;
+  const avgCarbon = discoverableProjects.length > 0
+    ? Math.round(discoverableProjects.reduce((acc, p) => acc + (p.target_carbon_tonnes || 0), 0) / discoverableProjects.length)
     : 0;
 
   const handleCompareToggle = (id: string) => {
