@@ -65,7 +65,7 @@ export default function RoleSelectionPage() {
               </div>
               <CardTitle className="text-xl">Sustainability Partner</CardTitle>
               <CardDescription className="mt-2">
-                Discover verified projects, support restoration efforts, and track your ESG impact.
+                Discover verified projects, partner with restoration efforts, and track your ESG impact.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-6">

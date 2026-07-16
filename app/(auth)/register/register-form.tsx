@@ -410,7 +410,7 @@ export default function RegisterForm() {
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
                   <p className="text-sm text-muted-foreground">
                     Identity verification (KYC) is required for all project owners
-                    to ensure platform integrity and enable support payments.
+                    to ensure platform integrity.
                   </p>
                 </div>
                 <FormField
@@ -594,7 +594,7 @@ export default function RegisterForm() {
               <div className="space-y-4 animate-fade-in">
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
                   <p className="text-sm text-muted-foreground">
-                    Bank details are used for receiving support payments from
+                    Bank details are used for receiving payments from
                     sustainability partners and carbon credit sales.
                   </p>
                 </div>

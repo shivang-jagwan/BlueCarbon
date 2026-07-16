@@ -6,7 +6,7 @@ import { useProjects, useAssignedProjects } from '@/hooks/use-projects';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  BarChart3, FileText, Download, TrendingUp, DollarSign, Leaf,
+  BarChart3, FileText, Download, TrendingUp, Leaf,
   Calendar, Award, Building2,
 } from 'lucide-react';
 
@@ -15,7 +15,7 @@ const OWNER_REPORTS = [
   { id: 'annual', label: 'Annual Report', icon: FileText, desc: 'Yearly performance overview' },
   { id: 'carbon', label: 'Carbon Report', icon: Leaf, desc: 'Carbon sequestration analysis' },
   { id: 'government', label: 'Government Report', icon: FileText, desc: 'Regulatory compliance report' },
-  { id: 'investor', label: 'Investor Report', icon: TrendingUp, desc: 'Impact metrics for investors' },
+  { id: 'impact', label: 'Impact Report', icon: TrendingUp, desc: 'Impact metrics and outcomes' },
   { id: 'passport', label: 'Passport Summary', icon: Award, desc: 'Carbon passport overview' },
 ];
 
@@ -32,7 +32,6 @@ const PARTNER_REPORTS = [
   { id: 'esg', label: 'ESG Report', icon: BarChart3, desc: 'Environmental, Social, and Governance impact' },
   { id: 'csr', label: 'CSR Report', icon: FileText, desc: 'Corporate Social Responsibility report' },
   { id: 'carbon', label: 'Carbon Impact Report', icon: Leaf, desc: 'Carbon sequestration from funded projects' },
-  { id: 'funding', label: 'Support Report', icon: DollarSign, desc: 'Support allocation and utilization' },
   { id: 'ngo', label: 'NGO Assessment', icon: Building2, desc: 'Verifier performance assessment' },
   { id: 'annual', label: 'Annual Sustainability Report', icon: TrendingUp, desc: 'Yearly sustainability impact' },
 ];
@@ -67,7 +66,7 @@ export default function ReportsPage() {
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><BarChart3 className="h-5 w-5" /></div>
-            <div><p className="text-xs text-muted-foreground">{isPartner ? 'Supported' : 'Total'} Projects</p><p className="font-display text-xl font-semibold">{projects.length}</p></div>
+            <div><p className="text-xs text-muted-foreground">Total Projects</p><p className="font-display text-xl font-semibold">{projects.length}</p></div>
           </div>
         </Card>
         <Card className="p-5">

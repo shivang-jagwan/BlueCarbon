@@ -2,479 +2,306 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { useMonitoringReports, useProject, useProjectPartnerships } from '@/hooks/use-projects';
-import { useAuth } from '@/components/providers/auth-provider';
+import { useMonitoringReports, useProjectPartnerships } from '@/hooks/use-projects';
 import { supabase } from '@/lib/supabase/client';
-import { FileUpload } from '@/components/shared/FileUpload';
-import { toast } from 'sonner';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import { REPORT_TYPE_LABELS, MONITORING_STATUS_LABELS } from '@/lib/types';
+import type { MonitoringReport, ReportType, MonitoringStatus } from '@/lib/types';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  ClipboardList,
-  Plus,
-  Clock,
+  BarChart3,
+  FileText,
+  Download,
+  Building2,
+  User,
+  Calendar,
   TrendingUp,
   Leaf,
-  Building2,
-  CheckCircle2,
-  XCircle,
-  ShieldCheck,
+  Map,
+  Clock,
   Handshake,
 } from 'lucide-react';
-import { MONITORING_STATUS_LABELS, type MonitoringStatus } from '@/lib/types';
-import { cn } from '@/lib/utils';
 
-function statusBadge(status: MonitoringStatus) {
-  const map: Record<MonitoringStatus, string> = {
-    draft: 'bg-muted text-muted-foreground',
-    submitted: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    reviewed: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    approved: 'bg-success/10 text-success',
-  };
-  return map[status];
-}
+const STATUS_COLORS: Record<MonitoringStatus, string> = {
+  draft: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  submitted: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  reviewed: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+};
 
-export default function MonitoringPage() {
-  const params = useParams();
-  const projectId = params.id as string;
-  const { reports, loading, refetch: refetchReports } = useMonitoringReports(projectId);
-  const { partnerships, refetch: refetchPartnerships } = useProjectPartnerships(projectId);
-  const { project } = useProject(projectId);
-  const { user } = useAuth();
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [submitting, setSubmitting] = React.useState(false);
-
-  const currentMonth = new Date().toISOString().slice(0, 7);
-
-  const [formData, setFormData] = React.useState({
-    period_month: currentMonth,
-    area_observed_hectares: '',
-    ndvi_avg: '',
-    carbon_estimate_tonnes: '',
-    notes: '',
-  });
-
-  const role = (user as any)?.user_metadata?.role;
-
-  const handleSubmit = async () => {
-    if (!user) return;
-    setSubmitting(true);
-    try {
-      const { error } = await supabase.from('monitoring_reports').insert({
-        project_id: projectId,
-        period_month: formData.period_month,
-        area_observed_hectares: formData.area_observed_hectares ? parseFloat(formData.area_observed_hectares) : null,
-        ndvi_avg: formData.ndvi_avg ? parseFloat(formData.ndvi_avg) : null,
-        carbon_estimate_tonnes: formData.carbon_estimate_tonnes ? parseFloat(formData.carbon_estimate_tonnes) : null,
-        notes: formData.notes || null,
-        status: 'submitted',
-        created_by: user.id,
-      });
-
-      if (error) throw error;
-
-      await supabase.from('project_activity').insert({
-        project_id: projectId,
-        actor_id: user.id,
-        event_type: 'monitoring_submitted',
-        title: 'Monthly Monitoring Submitted',
-        description: `Monitoring report for ${formData.period_month} submitted`,
-      });
-
-      toast.success('Monitoring report submitted');
-      setDialogOpen(false);
-      setFormData({
-        period_month: currentMonth,
-        area_observed_hectares: '',
-        ndvi_avg: '',
-        carbon_estimate_tonnes: '',
-        notes: '',
-      });
-      refetchReports();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to submit report');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Owner accepts/rejects: pending_owner → pending_verifier or rejected
-  const handleOwnerDecision = async (partnershipId: string, decision: 'accept' | 'reject') => {
-    try {
-      const newStatus = decision === 'accept' ? 'pending_verifier' : 'rejected';
-      const { error } = await supabase
-        .from('project_partnerships')
-        .update({ status: newStatus })
-        .eq('id', partnershipId);
-      if (error) throw error;
-
-      if (decision === 'accept') {
-        // Notify verifier that they need to accept
-        const partnership = partnerships.find(p => p.id === partnershipId);
-        if (partnership?.verifier_id) {
-          await supabase.from('notifications').insert({
-            user_id: partnership.verifier_id,
-            title: 'Monitoring Partnership — Acceptance Required',
-            body: `The Project Owner has accepted the monitoring partnership. Please review and accept.`,
-            type: 'verification',
-            link: `/dashboard/projects/${projectId}/monitoring`,
-          });
-        }
-      }
-
-      toast.success(decision === 'accept' ? 'Partnership accepted. Awaiting verifier confirmation.' : 'Partnership rejected');
-      refetchPartnerships();
-    } catch (err) {
-      toast.error('Failed to update partnership status');
-    }
-  };
-
-  // Verifier accepts/rejects: pending_verifier → active or rejected
-  const handleVerifierDecision = async (partnershipId: string, decision: 'accept' | 'reject') => {
-    try {
-      const update: any = decision === 'accept'
-        ? { status: 'active', started_at: new Date().toISOString() }
-        : { status: 'rejected' };
-
-      const { error } = await supabase
-        .from('project_partnerships')
-        .update(update)
-        .eq('id', partnershipId);
-      if (error) throw error;
-
-      if (decision === 'accept') {
-        // Notify owner that partnership is now active
-        const partnership = partnerships.find(p => p.id === partnershipId);
-        if (partnership?.owner_id) {
-          await supabase.from('notifications').insert({
-            user_id: partnership.owner_id,
-            title: 'Monitoring Partnership Activated',
-            body: `The verifier has accepted the monitoring partnership. The project is now under active monitoring.`,
-            type: 'verification',
-            link: `/dashboard/projects/${projectId}/monitoring`,
-          });
-        }
-
-        await supabase.from('project_activity').insert({
-          project_id: projectId,
-          actor_id: user?.id,
-          event_type: 'monitoring_partnership_activated',
-          title: 'Monitoring Partnership Activated',
-          description: 'Verifier accepted the monitoring partnership. Active monitoring has begun.',
-        });
-      }
-
-      toast.success(decision === 'accept' ? 'Partnership activated. Monitoring has begun.' : 'Partnership rejected');
-      refetchPartnerships();
-    } catch (err) {
-      toast.error('Failed to update partnership status');
-    }
-  };
-
-  const isOwner = project?.owner_id === user?.id;
-  const isVerifier = partnerships.some(p => p.verifier_id === user?.id);
-
-  const pendingOwnerReview = partnerships.filter(p => p.status === 'pending_owner');
-  const pendingVerifierReview = partnerships.filter(p => p.status === 'pending_verifier' && p.verifier_id === user?.id);
-  const activePartnerships = partnerships.filter(p => p.status === 'active');
-
-  const showPartnerships = (pendingOwnerReview.length > 0 || pendingVerifierReview.length > 0 || activePartnerships.length > 0) && (isOwner || isVerifier);
-
+function MetricItem({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="space-y-8">
-      {/* ============================================================ */}
-      {/* MONITORING PARTNERSHIPS SECTION                              */}
-      {/* ============================================================ */}
-      {showPartnerships && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-display text-xl font-semibold flex items-center gap-2">
-                <Handshake className="h-5 w-5 text-primary" />
-                Monitoring Partnerships
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Permanent monitoring relationships between Company, Owner, and Verifier
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            {/* Owner: pending invitations to review */}
-            {isOwner && pendingOwnerReview.map(p => (
-              <Card key={p.id} className="p-5 border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/20">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-blue-600" />
-                      {p.profiles?.organization || p.profiles?.full_name || 'Sustainability Partner'}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Wants to fund <span className="font-medium">{p.service_type}</span> monitoring by <span className="font-medium">{p.verifier?.organization || p.verifier?.full_name || 'Verifier'}</span>
-                    </p>
-                    <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
-                      {p.budget_usd && <span><span className="font-medium">Budget:</span> ${p.budget_usd.toLocaleString()}</span>}
-                      {p.start_date && <span><span className="font-medium">Starts:</span> {p.start_date}</span>}
-                    </div>
-                    {p.message && (
-                      <p className="mt-2 text-sm text-muted-foreground italic">&ldquo;{p.message}&rdquo;</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleOwnerDecision(p.id, 'reject')}>
-                      <XCircle className="mr-2 h-4 w-4" /> Reject
-                    </Button>
-                    <Button onClick={() => handleOwnerDecision(p.id, 'accept')}>
-                      <CheckCircle2 className="mr-2 h-4 w-4" /> Accept
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-
-            {/* Verifier: pending invitations to review */}
-            {isVerifier && pendingVerifierReview.map(p => (
-              <Card key={p.id} className="p-5 border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5 text-amber-600" />
-                      Monitoring Invitation
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      The Project Owner has accepted. You are invited to provide <span className="font-medium">{p.service_type}</span> monitoring for this project.
-                    </p>
-                    <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
-                      {p.budget_usd && <span><span className="font-medium">Budget:</span> ${p.budget_usd.toLocaleString()}</span>}
-                      {p.start_date && <span><span className="font-medium">Starts:</span> {p.start_date}</span>}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleVerifierDecision(p.id, 'reject')}>
-                      <XCircle className="mr-2 h-4 w-4" /> Decline
-                    </Button>
-                    <Button onClick={() => handleVerifierDecision(p.id, 'accept')}>
-                      <CheckCircle2 className="mr-2 h-4 w-4" /> Accept
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-
-            {/* Active partnerships */}
-            {activePartnerships.map(p => (
-              <Card key={p.id} className="p-5">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-success" />
-                      Active Partnership
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      <span className="font-medium">{p.profiles?.organization || p.profiles?.full_name || 'Company'}</span>
-                      {' '}funds{' '}
-                      <span className="font-medium">{p.service_type}</span>
-                      {' '}monitoring by{' '}
-                      <span className="font-medium">{p.verifier?.organization || p.verifier?.full_name || 'Verifier'}</span>
-                    </p>
-                    {p.started_at && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Active since {new Date(p.started_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="bg-success/10 text-success border-success/20">Active</Badge>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* MONTHLY MONITORING REPORTS                                   */}
-      {/* ============================================================ */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between pt-4 border-t">
-        <div>
-          <h2 className="font-display text-xl font-semibold">Monthly Monitoring Reports</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track restoration progress with monthly monitoring reports
-          </p>
-        </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Report
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>New Monitoring Report</DialogTitle>
-              <DialogDescription className="sr-only">Submit a new monitoring report for this project</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Period (Month)</Label>
-                <Input
-                  type="month"
-                  value={formData.period_month}
-                  onChange={(e) => setFormData({ ...formData, period_month: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <Label>Area Observed (ha)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="0.0"
-                    value={formData.area_observed_hectares}
-                    onChange={(e) => setFormData({ ...formData, area_observed_hectares: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>NDVI Average</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={formData.ndvi_avg}
-                    onChange={(e) => setFormData({ ...formData, ndvi_avg: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Carbon Est. (t)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="0.0"
-                    value={formData.carbon_estimate_tonnes}
-                    onChange={(e) => setFormData({ ...formData, carbon_estimate_tonnes: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Notes</Label>
-                <Textarea
-                  placeholder="Observations, challenges, growth patterns..."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Supporting Document (Optional)</Label>
-                <div className="mt-1.5">
-                  <FileUpload
-                    projectId={projectId}
-                    bucket="project-documents"
-                    category="monitoring"
-                    onUploadSuccess={() => {
-                      toast.success('Document successfully attached to project');
-                    }}
-                  />
-                </div>
-              </div>
-              <Button onClick={handleSubmit} disabled={submitting} className="w-full">
-                {submitting ? 'Submitting...' : 'Submit Report'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon className="h-3 w-3 text-slate-400" />
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
       </div>
-
-      {/* Reports */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Clock className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : reports.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-          <ClipboardList className="h-10 w-10 text-muted-foreground/40" />
-          <div>
-            <h3 className="font-semibold">No monitoring reports yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create your first monthly monitoring report to start tracking progress
-            </p>
-          </div>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {reports.map((report) => (
-            <Card key={report.id} className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <ClipboardList className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">
-                      {new Date(report.period_month + '-01').toLocaleDateString('en-US', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </h3>
-                    <span
-                      className={cn(
-                        'mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                        statusBadge(report.status)
-                      )}
-                    >
-                      {MONITORING_STATUS_LABELS[report.status]}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(report.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                {report.area_observed_hectares !== null && (
-                  <MetricItem icon={TrendingUp} label="Area Observed" value={`${report.area_observed_hectares} ha`} />
-                )}
-                {report.ndvi_avg !== null && (
-                  <MetricItem icon={Leaf} label="NDVI Average" value={report.ndvi_avg.toFixed(2)} />
-                )}
-                {report.carbon_estimate_tonnes !== null && (
-                  <MetricItem icon={TrendingUp} label="Carbon Est." value={`${report.carbon_estimate_tonnes} t`} />
-                )}
-              </div>
-
-              {report.notes && (
-                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-                  <p className="text-sm text-muted-foreground">{report.notes}</p>
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
-      )}
+      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{value}</p>
     </div>
   );
 }
 
-function MetricItem({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function SkeletonCard() {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-        <Icon className="h-4 w-4" />
+    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-lg bg-slate-200 dark:bg-slate-700" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 w-40 bg-slate-200 dark:bg-slate-700 rounded" />
+          <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
+        </div>
       </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+        <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+        <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+function formatMonth(periodMonth: string) {
+  const d = new Date(periodMonth + '-01');
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+const REPORT_TABS: { key: ReportType | 'all'; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'inspection', label: 'Inspection' },
+  { key: 'drone', label: 'Drone' },
+  { key: 'satellite', label: 'Satellite' },
+  { key: 'carbon', label: 'Carbon' },
+  { key: 'health', label: 'Health' },
+];
+
+export default function MonitoringPage() {
+  const params = useParams();
+  const projectId = params.id as string;
+  const { reports, loading } = useMonitoringReports(projectId);
+  const { partnerships, loading: partnershipsLoading } = useProjectPartnerships(projectId);
+  const [activeTab, setActiveTab] = React.useState<ReportType | 'all'>('all');
+
+  const activePartnerships = partnerships.filter((p: any) => p.status === 'active');
+
+  const typedReports = reports as MonitoringReport[];
+
+  const filteredReports = activeTab === 'all'
+    ? typedReports
+    : typedReports.filter((r) => (r as any).report_type === activeTab);
+
+  const totalReports = typedReports.length;
+  const approvedCount = typedReports.filter((r) => r.status === 'approved').length;
+  const pendingCount = typedReports.filter((r) => r.status === 'submitted' || r.status === 'reviewed').length;
+  const orgSet = new Set(typedReports.map((r) => (r as any).organization_name).filter(Boolean));
+  const orgCount = orgSet.size;
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
       <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold">{value}</p>
+        <h1 className="font-display text-2xl font-semibold text-slate-900 dark:text-slate-100">Monitoring Center</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Read-only monitoring workspace. Reports are submitted by Verification Organizations.
+        </p>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-1">
+            <FileText className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wide">Total Reports</span>
+          </div>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            {loading ? '-' : totalReports}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-1">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wide">Approved</span>
+          </div>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {loading ? '-' : approvedCount}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-1">
+            <Clock className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wide">Pending</span>
+          </div>
+          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            {loading ? '-' : pendingCount}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-1">
+            <Building2 className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wide">Organizations</span>
+          </div>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            {loading ? '-' : orgCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Active Partnerships */}
+      {!partnershipsLoading && activePartnerships.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Handshake className="h-4 w-4 text-primary" />
+            Active Monitoring Partnerships
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {activePartnerships.map((p: any) => (
+              <div
+                key={p.id}
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="h-4 w-4 text-slate-400" />
+                  <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                    {p.profiles?.organization || p.profiles?.full_name || 'Organization'}
+                  </span>
+                </div>
+                {p.verifier && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                    Verifier: {p.verifier.organization || p.verifier.full_name || 'N/A'}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  <span>Service: {p.service_type}</span>
+                  {p.started_at && (
+                    <span>
+                      Since: {new Date(p.started_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  Active
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reports Section */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Reports</h2>
+
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-1.5">
+          {REPORT_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Report List */}
+        {loading ? (
+          <div className="space-y-4">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : filteredReports.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center">
+            <BarChart3 className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100">No monitoring reports yet</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Reports submitted by Verification Organizations will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredReports.map((report) => {
+              const r = report as any;
+              const reportType: ReportType = r.report_type || 'monthly';
+              const statusLabel = MONITORING_STATUS_LABELS[report.status];
+              const statusColor = STATUS_COLORS[report.status];
+
+              return (
+                <div
+                  key={report.id}
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                        {REPORT_TYPE_LABELS[reportType]} &mdash; {formatMonth(report.period_month)}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {r.organization_name && (
+                          <span className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {r.organization_name}
+                          </span>
+                        )}
+                        {r.submitted_by_name && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {r.submitted_by_name}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(report.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+
+                  {/* Metrics */}
+                  <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                    {report.area_observed_hectares !== null && (
+                      <MetricItem icon={Map} label="Area" value={`${report.area_observed_hectares} ha`} />
+                    )}
+                    {report.ndvi_avg !== null && (
+                      <MetricItem icon={Leaf} label="NDVI" value={report.ndvi_avg.toFixed(2)} />
+                    )}
+                    {report.carbon_estimate_tonnes !== null && (
+                      <MetricItem icon={TrendingUp} label="Carbon" value={`${report.carbon_estimate_tonnes} t`} />
+                    )}
+                  </div>
+
+                  {/* Notes */}
+                  {report.notes && (
+                    <div className="mb-4 rounded-lg bg-slate-50 dark:bg-slate-800 p-3">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">{report.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Download */}
+                  {r.file_url && (
+                    <a
+                      href={r.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download Report
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ import {
   Ruler, Leaf, Users, Sprout, Building2, FolderKanban,
   TrendingUp, MapPin, BarChart3, Globe,
 } from 'lucide-react';
-import { PROJECT_TYPE_LABELS, type Project, type ProjectType, type ProjectSupport } from '@/lib/types';
+import { PROJECT_TYPE_LABELS, type Project, type ProjectType } from '@/lib/types';
 
 export default function ImpactDashboardPage() {
   const { user } = useAuth();
@@ -20,18 +20,10 @@ export default function ImpactDashboardPage() {
     if (!user) return;
     (async () => {
       setLoading(true);
-      const { data: contribs } = await supabase
-        .from('project_support')
-        .select('project_id')
-        .eq('partner_id', user.id);
-      const projectIds = Array.from(new Set((contribs || []).map((c: ProjectSupport) => c.project_id)));
-      if (projectIds.length > 0) {
-        const { data: projData } = await supabase
-          .from('projects')
-          .select('*')
-          .in('id', projectIds);
-        setProjects((projData as Project[]) || []);
-      }
+      const { data: projData } = await supabase
+        .from('projects')
+        .select('*');
+      setProjects((projData as Project[]) || []);
       setLoading(false);
     })();
   }, [user]);
@@ -52,7 +44,7 @@ export default function ImpactDashboardPage() {
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Impact Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Executive overview of your sustainability support and environmental impact
+          Executive overview of your sustainability initiatives and environmental impact
         </p>
       </div>
 
@@ -63,7 +55,7 @@ export default function ImpactDashboardPage() {
         <KpiCard label="Active Projects" value={activeProjects} icon={FolderKanban} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard label="Communities Supported" value="—" hint="Coming soon" icon={Users} />
+        <KpiCard label="Communities Impacted" value="—" hint="Coming soon" icon={Users} />
         <KpiCard label="Mangroves Restored" value={`${(typeBreakdown.mangrove || 0)} projects`} icon={Sprout} />
         <KpiCard label="Wetlands Restored" value={`${(typeBreakdown.salt_marsh || 0) + (typeBreakdown.seagrass || 0)} projects`} icon={Globe} />
       </div>
@@ -129,14 +121,14 @@ export default function ImpactDashboardPage() {
       <Card className="p-6">
         <div className="mb-4 flex items-center gap-2">
           <MapPin className="h-4.5 w-4.5 text-primary" />
-          <h2 className="font-semibold">Supported Project Locations</h2>
+          <h2 className="font-semibold">Project Locations</h2>
         </div>
         <div className="relative h-64 overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 to-accent/10">
           {projects.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <Globe className="mx-auto h-10 w-10 text-muted-foreground/30" />
-                <p className="mt-2 text-sm text-muted-foreground">No supported projects yet</p>
+                <p className="mt-2 text-sm text-muted-foreground">No projects yet</p>
               </div>
             </div>
           ) : (

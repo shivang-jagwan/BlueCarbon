@@ -13,7 +13,6 @@ import {
   Search,
   GitCompare,
   Building2,
-  DollarSign,
   BarChart3,
   Users,
   Sparkles,
@@ -109,7 +108,6 @@ export const PARTNER_NAV: NavSection[] = [
     title: 'Engage',
     items: [
       { label: 'Verifier Directory', href: '/dashboard/verifiers', icon: Building2 },
-      { label: 'Support Center', href: '/dashboard/funding', icon: DollarSign },
       { label: 'Impact Dashboard', href: '/dashboard/impact', icon: BarChart3 },
       { label: 'Reports', href: '/dashboard/reports', icon: FileText },
     ],

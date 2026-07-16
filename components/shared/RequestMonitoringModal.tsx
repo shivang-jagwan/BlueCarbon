@@ -60,9 +60,9 @@ export function RequestMonitoringModal({
   const [activeTab, setActiveTab] = React.useState<string>('saved');
 
   const [savedProjects, setSavedProjects] = React.useState<Project[]>([]);
-  const [supportedProjects, setSupportedProjects] = React.useState<Project[]>([]);
+  const [partneredProjects, setSupportedProjects] = React.useState<Project[]>([]);
   const [loadingSaved, setLoadingSaved] = React.useState(false);
-  const [loadingSupported, setLoadingSupported] = React.useState(false);
+  const [loadingPartnered, setLoadingSupported] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const [projectId, setProjectId] = React.useState('');
@@ -105,7 +105,7 @@ export function RequestMonitoringModal({
       setLoadingSaved(false);
     };
 
-    const loadSupported = async () => {
+    const loadPartnered = async () => {
       setLoadingSupported(true);
       const { data: partnerships } = await supabase
         .from('project_partnerships')
@@ -130,7 +130,7 @@ export function RequestMonitoringModal({
     };
 
     loadSaved();
-    loadSupported();
+    loadPartnered();
   }, [isOpen, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +142,7 @@ export function RequestMonitoringModal({
 
     setIsSubmitting(true);
     try {
-      const allProjects = [...savedProjects, ...supportedProjects];
+      const allProjects = [...savedProjects, ...partneredProjects];
       const selectedProject = allProjects.find((p) => p.id === projectId);
       if (!selectedProject) throw new Error('Project not found');
 
@@ -211,9 +211,9 @@ export function RequestMonitoringModal({
             activeTab={activeTab}
             onTabChange={setActiveTab}
             savedProjects={savedProjects}
-            supportedProjects={supportedProjects}
+            partneredProjects={partneredProjects}
             loadingSaved={loadingSaved}
-            loadingSupported={loadingSupported}
+            loadingPartnered={loadingPartnered}
             selectedId={selected}
             onSelect={setProjectId}
             onClose={onClose}
@@ -302,9 +302,9 @@ interface ProjectSelectorProps {
   activeTab: string;
   onTabChange: (v: string) => void;
   savedProjects: Project[];
-  supportedProjects: Project[];
+  partneredProjects: Project[];
   loadingSaved: boolean;
-  loadingSupported: boolean;
+  loadingPartnered: boolean;
   selectedId: string;
   onSelect: (id: string) => void;
   onClose: () => void;
@@ -314,9 +314,9 @@ function ProjectSelector({
   activeTab,
   onTabChange,
   savedProjects,
-  supportedProjects,
+  partneredProjects,
   loadingSaved,
-  loadingSupported,
+  loadingPartnered,
   selectedId,
   onSelect,
   onClose,
@@ -400,14 +400,14 @@ function ProjectSelector({
     </div>
   );
 
-  const renderSupportedEmpty = () => (
+  const renderPartneredEmpty = () => (
     <div className="flex flex-col items-center justify-center py-8 text-center">
       <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
         <FolderCheck className="h-6 w-6 text-muted-foreground/50" />
       </div>
-      <p className="text-sm font-medium mb-1">No active support relationships</p>
+      <p className="text-sm font-medium mb-1">No active partnerships</p>
       <p className="text-xs text-muted-foreground max-w-[250px]">
-        Projects you already support will appear here.
+        Projects with active monitoring partnerships will appear here.
       </p>
     </div>
   );
@@ -416,7 +416,7 @@ function ProjectSelector({
     <div className="space-y-3">
       <Label>Select a Project</Label>
       <p className="text-xs text-muted-foreground -mt-1 mb-1">
-        Choose a project you want to support with monitoring.
+        Choose a project to monitor.
       </p>
 
       <Tabs value={activeTab} onValueChange={onTabChange}>
@@ -430,12 +430,12 @@ function ProjectSelector({
               </Badge>
             ) : null}
           </TabsTrigger>
-          <TabsTrigger value="supported" className="flex-1 gap-1.5 text-xs">
+          <TabsTrigger value="partnered" className="flex-1 gap-1.5 text-xs">
             <FolderCheck className="h-3.5 w-3.5" />
-            Supported Projects
-            {supportedProjects.length > 0 ? (
+            Partnered Projects
+            {partneredProjects.length > 0 ? (
               <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 text-[10px]">
-                {supportedProjects.length}
+                {partneredProjects.length}
               </Badge>
             ) : null}
           </TabsTrigger>
@@ -453,14 +453,14 @@ function ProjectSelector({
           )}
         </TabsContent>
 
-        <TabsContent value="supported" className="mt-3">
-          {loadingSupported ? (
+        <TabsContent value="partnered" className="mt-3">
+          {loadingPartnered ? (
             renderLoading()
-          ) : supportedProjects.length === 0 ? (
-            renderSupportedEmpty()
+          ) : partneredProjects.length === 0 ? (
+            renderPartneredEmpty()
           ) : (
             <ScrollArea className="h-[240px] rounded-md border p-2">
-              <div className="grid gap-2">{supportedProjects.map(renderCard)}</div>
+              <div className="grid gap-2">{partneredProjects.map(renderCard)}</div>
             </ScrollArea>
           )}
         </TabsContent>

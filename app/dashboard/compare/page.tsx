@@ -85,7 +85,7 @@ export default function ComparePage() {
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">Project Comparison</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Compare up to 4 projects side by side to make informed support decisions
+            Compare up to 4 projects side by side to make informed decisions
           </p>
         </div>
         {selected.length < 4 && (

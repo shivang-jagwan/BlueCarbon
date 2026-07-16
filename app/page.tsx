@@ -105,7 +105,7 @@ export default function LandingPage() {
     { icon: FileText, title: 'Register Project', desc: 'Create account and register your blue carbon project.' },
     { icon: Shield, title: 'Verification Service', desc: 'Request verification from certified organizations.' },
     { icon: CheckCircle2, title: 'Project Published', desc: 'Approved projects become discoverable by partners.' },
-    { icon: HeartHandshake, title: 'Project Support', desc: 'Sustainability partners establish monitoring partnerships.' },
+    { icon: HeartHandshake, title: 'Partner Network', desc: 'Sustainability partners establish monitoring partnerships.' },
     { icon: Handshake, title: 'Monitoring Partnership', desc: 'Project owner and monitoring org finalize agreement.' },
     { icon: Fingerprint, title: 'Carbon Passport', desc: 'Verified carbon credits issued as immutable passports.' },
   ];

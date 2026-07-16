@@ -71,13 +71,13 @@ export async function getIdentityVerification(userId: string) {
     .from('identity_verifications')
     .select('*, identity_documents(*)')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Failed to fetch identity verification:', error);
     throw new Error('Failed to fetch identity verification');
   }
-  return data as IdentityVerification & { identity_documents: IdentityDocument[] };
+  return data as (IdentityVerification & { identity_documents: IdentityDocument[] }) | null;
 }
 
 // ============================================================

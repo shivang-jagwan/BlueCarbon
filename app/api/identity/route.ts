@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
     }
+    if (auth.user.role !== 'admin' && userId !== auth.user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const verification = await getIdentityVerification(userId);
     return NextResponse.json({ verification });
   } catch (error) {

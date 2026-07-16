@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/components/providers/auth-provider';
-import type { Project, ProjectActivity, ProjectFile, MonitoringReport, ProjectSupport, NotificationItem, VerificationServiceRequest, VerificationDecisionRecord, DiscussionComment } from '@/lib/types';
+import type { Project, ProjectActivity, ProjectFile, MonitoringReport, NotificationItem, VerificationServiceRequest, VerificationDecisionRecord, DiscussionComment } from '@/lib/types';
 
 export function useProjects() {
   const { user } = useAuth();
@@ -158,34 +158,6 @@ export function useMonitoringReports(projectId: string | null) {
 
   return { reports, loading, refetch: load };
 }
-
-export function useProjectSupport(projectId: string | null) {
-  const [contributions, setContributions] = React.useState<ProjectSupport[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  const load = React.useCallback(async () => {
-    if (!projectId) {
-      setContributions([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const { data } = await supabase
-      .from('project_support')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
-    setContributions((data as ProjectSupport[]) || []);
-    setLoading(false);
-  }, [projectId]);
-
-  React.useEffect(() => {
-    load();
-  }, [load]);
-
-  return { contributions, loading, refetch: load };
-}
-export const useFunding = useProjectSupport; // backward compat alias
 
 export function useNotifications() {
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);

@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { useProject } from '@/hooks/use-projects';
-import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -27,27 +26,33 @@ import {
   Trash2,
   Save,
   Clock,
+  Upload,
+  ImageIcon,
+  Loader2,
 } from 'lucide-react';
-import { PROJECT_TYPE_LABELS, type ProjectType, type ProjectStatus } from '@/lib/types';
+import { PROJECT_TYPE_LABELS, type ProjectType } from '@/lib/types';
 
 export default function ProjectSettingsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const router = useRouter();
   const { project, loading } = useProject(projectId);
-  const { user } = useAuth();
   const [saving, setSaving] = React.useState(false);
 
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [projectType, setProjectType] = React.useState<ProjectType>('mangrove');
   const [visibility, setVisibility] = React.useState('public');
+  const [coverImage, setCoverImage] = React.useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = React.useState(false);
+  const coverInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (project) {
       setName(project.name);
       setDescription(project.description || '');
       setProjectType(project.project_type);
+      setCoverImage(project.cover_image_url || null);
     }
   }, [project]);
 
@@ -84,6 +89,68 @@ export default function ProjectSettingsPage() {
       router.push('/dashboard/projects');
     } catch (err) {
       toast.error('Failed to archive project');
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be under 10MB');
+      return;
+    }
+
+    setUploadingCover(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${projectId}/cover.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('project-cover-images')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('project-cover-images')
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData.publicUrl;
+
+      const { error: dbError } = await supabase
+        .from('projects')
+        .update({ cover_image_url: publicUrl })
+        .eq('id', projectId);
+
+      if (dbError) throw dbError;
+
+      setCoverImage(publicUrl);
+      toast.success('Cover image updated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to upload cover image');
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const handleCoverRemove = async () => {
+    if (!confirm('Remove the cover image?')) return;
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ cover_image_url: null })
+        .eq('id', projectId);
+      if (error) throw error;
+      setCoverImage(null);
+      toast.success('Cover image removed');
+    } catch (err) {
+      toast.error('Failed to remove cover image');
     }
   };
 
@@ -142,6 +209,80 @@ export default function ProjectSettingsPage() {
         </Button>
       </Card>
 
+      {/* Project Appearance */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <ImageIcon className="h-4.5 w-4.5 text-primary" />
+          <h2 className="font-semibold">Project Appearance</h2>
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Upload a cover image that will be displayed on your project card.
+        </p>
+
+        <input
+          type="file"
+          ref={coverInputRef}
+          onChange={handleCoverUpload}
+          className="hidden"
+          accept="image/jpeg,image/png,image/webp"
+        />
+
+        {coverImage ? (
+          <div className="space-y-3">
+            <div className="relative h-40 w-full overflow-hidden rounded-lg border border-border">
+              <Image
+                src={coverImage}
+                alt="Project cover"
+                fill
+                className="object-cover"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={uploadingCover}
+              >
+                {uploadingCover ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-3.5 w-3.5" />
+                )}
+                Replace Image
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCoverRemove}
+                disabled={uploadingCover}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => !uploadingCover && coverInputRef.current?.click()}
+            className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:border-primary/40 hover:bg-muted/30"
+          >
+            {uploadingCover ? (
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            ) : (
+              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+            )}
+            <p className="mt-2 text-sm font-medium">
+              {uploadingCover ? 'Uploading...' : 'Click to upload a cover image'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              JPG, PNG, or WebP. Max 10MB.
+            </p>
+          </div>
+        )}
+      </Card>
+
       {/* Visibility */}
       <Card className="p-6">
         <div className="mb-4 flex items-center gap-2">
@@ -170,7 +311,6 @@ export default function ProjectSettingsPage() {
           {[
             'Verification status updates',
             'New evidence comments',
-            'Support received',
             'Monthly monitoring reminders',
             'NGO messages',
           ].map((item) => (

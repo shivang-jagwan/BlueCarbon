@@ -30,13 +30,6 @@ const REPORTS = [
     columns: 'id, project_id, verifier_id, request_type, status, priority, created_at',
   },
   {
-    id: 'funding',
-    title: 'Support Report',
-    description: 'Financial extract of all committed and completed support across projects.',
-    table: 'project_support',
-    columns: 'id, project_id, partner_id, amount_usd, carbon_credits_tonnes, status, created_at',
-  },
-  {
     id: 'carbon',
     title: 'Carbon Impact Report',
     description: 'Total carbon tonnes sequestered, estimated impact, and passports issued platform-wide.',

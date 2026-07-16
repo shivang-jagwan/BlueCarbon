@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useNotifications } from '@/hooks/use-projects';
 import { supabase } from '@/lib/supabase/client';
-import type { Project, ProjectSupport } from '@/lib/types';
+import type { Project } from '@/lib/types';
 import { KpiCard } from '@/components/shared/kpi-card';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   FolderKanban, Building2, Ruler, Leaf, FileText,
-  ArrowRight, Globe, GitCompare, DollarSign, BarChart3,
+  ArrowRight, Globe, GitCompare, BarChart3,
   Bell, CheckCircle2, Bookmark, BellRing
 } from 'lucide-react';
 import { UpcomingEventsWidget } from '@/components/shared/calendar/UpcomingEventsWidget';
@@ -23,7 +23,6 @@ const QUICK_ACTIONS = [
   { label: 'Discover Projects', href: '/dashboard/discover', icon: Globe, color: 'text-primary' },
   { label: 'Saved Projects', href: '/dashboard/saved-projects', icon: Bookmark, color: 'text-accent' },
   { label: 'Compare Projects', href: '/dashboard/compare', icon: GitCompare, color: 'text-warning' },
-  { label: 'Support Center', href: '/dashboard/funding', icon: DollarSign, color: 'text-success' },
   { label: 'Impact Dashboard', href: '/dashboard/impact', icon: BarChart3, color: 'text-primary' },
   { label: 'View Reports', href: '/dashboard/reports', icon: FileText, color: 'text-accent' },
 ];
@@ -32,22 +31,13 @@ export default function PartnerDashboard() {
   const { profile, user } = useAuth();
   const { notifications } = useNotifications();
   const [stats, setStats] = React.useState({ 
-    supportedProjects: 0, activeProjects: 0, ngosPartnered: 0, 
-    totalArea: 0, carbonSequestered: 0, savedProjects: 0, followedProjects: 0 
+    savedProjects: 0, followedProjects: 0 
   });
-  const [supportedProjectsList, setSupportedProjectsList] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (!user) return;
     (async () => {
       try {
-        const { data: contributions } = await supabase
-          .from('project_support')
-          .select('project_id')
-          .eq('partner_id', user.id);
-        
-        const projectIds = new Set((contributions || []).map((c: ProjectSupport) => c.project_id));
-        
         const { count: savedCount } = await supabase
           .from('saved_projects')
           .select('*', { count: 'exact', head: true })
@@ -60,31 +50,9 @@ export default function PartnerDashboard() {
 
         setStats((prev) => ({
           ...prev,
-          supportedProjects: projectIds.size,
           savedProjects: savedCount || 0,
           followedProjects: followedCount || 0,
         }));
-
-        if (projectIds.size > 0) {
-          const { data: projects } = await supabase
-            .from('projects')
-            .select('*, profiles!owner_id(organization, full_name)')
-            .in('id', Array.from(projectIds));
-            
-          setSupportedProjectsList(projects || []);
-
-          const active = (projects || []).filter((p: Project) => p.status === 'active' || p.status === 'verified').length;
-          const area = (projects || []).reduce((s: number, p: Project) => s + (p.area_hectares || 0), 0);
-          const carbon = (projects || []).reduce((s: number, p: Project) => s + (p.target_carbon_tonnes || 0), 0);
-          
-          setStats((prev) => ({
-            ...prev,
-            activeProjects: active,
-            totalArea: area,
-            carbonSequestered: carbon,
-            ngosPartnered: 0,
-          }));
-        }
       } catch {
         // Tables may not exist yet in production
       }
@@ -103,12 +71,6 @@ export default function PartnerDashboard() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Supported Projects" value={stats.supportedProjects} hint={`${stats.activeProjects} active`} icon={FolderKanban} />
-        <KpiCard label="Total Area Restored" value={`${stats.totalArea.toFixed(1)} ha`} icon={Ruler} />
-        <KpiCard label="Est. CO₂ Sequestered" value={`${stats.carbonSequestered.toLocaleString()} t`} icon={Leaf} />
-        <KpiCard label="NGOs Partnered" value={stats.ngosPartnered} icon={Building2} />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard label="Saved Projects" value={stats.savedProjects} hint="Bookmarked for review" icon={Bookmark} />
         <KpiCard label="Projects Following" value={stats.followedProjects} hint="Receiving updates" icon={BellRing} />
         <KpiCard label="Unread Notifications" value={unreadNotifications} icon={Bell} />
@@ -133,50 +95,15 @@ export default function PartnerDashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* My Supported Projects */}
+        {/* Empty State */}
         <div className="lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-              <FolderKanban className="h-5 w-5 text-primary" /> My Supported Projects
-            </h2>
-            <Button asChild variant="ghost" size="sm"><Link href="/dashboard/impact">View Impact<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Link></Button>
-          </div>
-          <Card className="p-0 overflow-hidden">
-            {supportedProjectsList.length === 0 ? (
-              <div className="p-8 text-center border-dashed border-2 m-4 rounded-xl">
-                <Leaf className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-                <h3 className="font-semibold text-sm">No supported projects yet</h3>
-                <p className="text-xs text-muted-foreground mt-1 mb-4">Start discovering projects to fund and monitor their impact.</p>
-                <Button asChild size="sm">
-                  <Link href="/dashboard/discover">Discover Projects</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {supportedProjectsList.map((project, i) => (
-                  <Link key={project.id} href={`/dashboard/projects/${project.id}`}>
-                    <div className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary">
-                          {project.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm leading-tight">{project.name}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{project.profiles?.organization || project.profiles?.full_name}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 text-right">
-                        <div className="hidden sm:block">
-                          <p className="text-xs text-muted-foreground">Status</p>
-                          <p className="text-sm font-medium capitalize">{project.status.replace('_', ' ')}</p>
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
+          <Card className="p-8 text-center border-dashed">
+            <Globe className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <h3 className="font-semibold text-sm">Discover Projects</h3>
+            <p className="text-xs text-muted-foreground mt-1 mb-4">Browse verified blue carbon projects and track their impact over time.</p>
+            <Button asChild size="sm">
+              <Link href="/dashboard/discover">Discover Projects</Link>
+            </Button>
           </Card>
         </div>
 

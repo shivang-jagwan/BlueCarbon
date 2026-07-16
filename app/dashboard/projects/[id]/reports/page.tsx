@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { useProject, useMonitoringReports, useFunding } from '@/hooks/use-projects';
+import { useProject, useMonitoringReports } from '@/hooks/use-projects';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +10,6 @@ import {
   FileText,
   Download,
   TrendingUp,
-  DollarSign,
   Leaf,
   Calendar,
 } from 'lucide-react';
@@ -20,7 +19,7 @@ const REPORT_TYPES = [
   { id: 'annual', label: 'Annual Report', icon: FileText, desc: 'Yearly project performance' },
   { id: 'carbon', label: 'Carbon Report', icon: Leaf, desc: 'Carbon sequestration analysis' },
   { id: 'government', label: 'Government Report', icon: FileText, desc: 'Regulatory compliance report' },
-  { id: 'investor', label: 'Investor Report', icon: TrendingUp, desc: 'Impact metrics for investors' },
+  { id: 'impact', label: 'Impact Report', icon: TrendingUp, desc: 'Impact metrics for the project' },
 ];
 
 export default function ReportsPage() {
@@ -28,12 +27,6 @@ export default function ReportsPage() {
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { reports } = useMonitoringReports(projectId);
-  const { contributions } = useFunding(projectId);
-
-  const totalFunding = contributions
-    .filter((c) => c.status === 'completed')
-    .reduce((s, c) => s + c.amount_usd, 0);
-
   return (
     <div className="space-y-6">
       <div>
@@ -68,7 +61,6 @@ export default function ReportsPage() {
         <h2 className="mb-4 font-display text-lg font-semibold">Project Summary</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryItem icon={BarChart3} label="Monitoring Reports" value={String(reports.length)} />
-          <SummaryItem icon={DollarSign} label="Total Support" value={`$${totalFunding.toLocaleString()}`} />
           <SummaryItem icon={Leaf} label="Area" value={project?.area_hectares ? `${project.area_hectares.toFixed(1)} ha` : '—'} />
           <SummaryItem icon={TrendingUp} label="Health Score" value={project?.health_score ? `${project.health_score}/100` : '—'} />
         </div>

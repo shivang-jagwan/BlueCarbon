@@ -15,7 +15,7 @@ import { getRoleLabel } from '@/lib/navigation';
 
 const QUICK_ACTIONS = [
   { label: 'Register New Project', href: '/dashboard/projects/new', icon: Plus, color: 'text-primary' },
-  { label: 'Browse Support', href: '/dashboard/discover', icon: Search, color: 'text-accent' },
+  { label: 'Discover Projects', href: '/dashboard/discover', icon: Search, color: 'text-accent' },
   { label: 'Find Verifier', href: '/dashboard/verifiers', icon: Building2, color: 'text-warning' },
   { label: 'View Reports', href: '/dashboard/reports', icon: FileText, color: 'text-success' },
 ];
@@ -44,7 +44,7 @@ export default function OwnerDashboard() {
         <KpiCard label="Total Projects" value={projects.length} hint={loading ? 'Loading...' : `${activeProjects} active`} icon={FolderKanban} />
         <KpiCard label="Pending Verifications" value={pendingVerifications} hint={pendingVerifications > 0 ? 'Awaiting review' : 'All clear'} icon={ShieldCheck} />
         <KpiCard label="Carbon Passports" value={passportsIssued} hint={passportsIssued > 0 ? 'Issued' : 'None yet'} icon={Award} />
-        <KpiCard label="Support Received" value={projects.reduce((sum, p) => sum + (p.verified_carbon_tonnes ?? 0), 0) > 0 ? `${projects.reduce((sum, p) => sum + (p.verified_carbon_tonnes ?? 0), 0).toLocaleString()} t` : '—'} hint="Carbon credits" icon={DollarSign} />
+        <KpiCard label="Revenue" value={projects.reduce((sum, p) => sum + (p.verified_carbon_tonnes ?? 0), 0) > 0 ? `${projects.reduce((sum, p) => sum + (p.verified_carbon_tonnes ?? 0), 0).toLocaleString()} t` : '—'} hint="Carbon credits" icon={DollarSign} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -82,7 +82,7 @@ export default function OwnerDashboard() {
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {projects.slice(0, 4).map((project) => <ProjectCard key={project.id} project={project} href={`/dashboard/projects/${project.id}`} />)}
+              {projects.slice(0, 4).map((project) => <ProjectCard key={project.id} project={project} href={`/dashboard/projects/${project.id}`} ownerName={profile?.full_name || undefined} />)}
             </div>
           )}
         </div>

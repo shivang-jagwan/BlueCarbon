@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SupportProjectModal } from '@/components/shared/SupportProjectModal';
 import { SaveProjectButton } from '@/components/shared/SaveProjectButton';
 import { FollowProjectButton } from '@/components/shared/FollowProjectButton';
 import {
@@ -26,7 +25,6 @@ import {
   Globe,
   HeartPulse,
   ShieldCheck,
-  ArrowRight,
   Filter,
   BarChart3,
   GitCompare
@@ -74,10 +72,6 @@ export default function DiscoverPage() {
 
   // Compare State
   const [compareIds, setCompareIds] = React.useState<string[]>([]);
-
-  // Modal State
-  const [supportModalOpen, setSupportModalOpen] = React.useState(false);
-  const [selectedProject, setSelectedProject] = React.useState<ProjectWithProfile | null>(null);
   
   React.useEffect(() => {
     (async () => {
@@ -134,7 +128,6 @@ export default function DiscoverPage() {
   // Calculate Metrics
   const totalProjects = projects.length;
   const verifiedProjects = projects.filter(p => p.status === 'verified').length;
-  const seekingSupportProjects = projects.filter(p => p.status === 'registered' || p.status === 'verified').length; // Proxy for seeking support
   const avgCarbon = projects.length > 0 
     ? Math.round(projects.reduce((acc, p) => acc + (p.target_carbon_tonnes || 0), 0) / projects.length)
     : 0;
@@ -143,7 +136,6 @@ export default function DiscoverPage() {
     setCompareIds(prev => {
       if (prev.includes(id)) return prev.filter(i => i !== id);
       if (prev.length >= 3) {
-        // Just replace the oldest if they try to add more than 3, or alert. Alert is better.
         return prev;
       }
       return [...prev, id];
@@ -151,8 +143,6 @@ export default function DiscoverPage() {
   };
 
   const getCustomStatusBadge = (project: ProjectWithProfile) => {
-    if (project.status === 'registered') return <Badge className="bg-blue-500 hover:bg-blue-600 border-0">Seeking Support</Badge>;
-    if (project.status === 'verified') return <Badge className="bg-success hover:bg-success border-0 text-white">Open for Support</Badge>;
     if (project.status === 'active') return <Badge className="bg-indigo-500 hover:bg-indigo-600 border-0 text-white">Monitoring Active</Badge>;
     if (project.status === 'completed') return <Badge className="bg-primary hover:bg-primary border-0 text-white">Completed</Badge>;
     return (
@@ -167,7 +157,7 @@ export default function DiscoverPage() {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Project Discovery Hub</h1>
         <p className="mt-2 text-muted-foreground">
-          Browse, evaluate, and support verified blue carbon restoration projects around the globe.
+          Browse and evaluate verified blue carbon restoration projects around the globe.
         </p>
       </div>
 
@@ -186,13 +176,6 @@ export default function DiscoverPage() {
             <h3 className="text-sm font-medium">Verified Projects</h3>
           </div>
           <p className="text-2xl font-display font-bold">{verifiedProjects}</p>
-        </Card>
-        <Card className="p-4 flex flex-col justify-center bg-primary/10 border-primary/20 shadow-sm">
-          <div className="flex items-center gap-2 text-primary mb-1">
-            <HeartPulse className="h-4 w-4" />
-            <h3 className="text-sm font-medium">Seeking Support</h3>
-          </div>
-          <p className="text-2xl font-display font-bold text-primary">{seekingSupportProjects}</p>
         </Card>
         <Card className="p-4 flex flex-col justify-center bg-card shadow-sm">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -236,7 +219,7 @@ export default function DiscoverPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="registered">Seeking Support</SelectItem>
+                <SelectItem value="registered">Registered</SelectItem>
                 <SelectItem value="verified">Verified</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
               </SelectContent>
@@ -409,14 +392,6 @@ export default function DiscoverPage() {
                         View Details
                       </Link>
                     </Button>
-                    {profile?.role === 'sustainability_partner' && (
-                      <Button 
-                        className="flex-1" 
-                        onClick={() => { setSelectedProject(project); setSupportModalOpen(true); }}
-                      >
-                        Support <ArrowRight className="ml-1.5 h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               </Card>
@@ -476,17 +451,6 @@ export default function DiscoverPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Support Project Modal */}
-      {selectedProject && (
-        <SupportProjectModal 
-          isOpen={supportModalOpen}
-          onClose={() => { setSupportModalOpen(false); setSelectedProject(null); }}
-          projectId={selectedProject.id}
-          projectName={selectedProject.name}
-          ownerId={selectedProject.owner_id}
-        />
       )}
     </div>
   );

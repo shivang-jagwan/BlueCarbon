@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from '@/components/shared/kpi-card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, FolderKanban, ShieldCheck, Award, DollarSign, Activity, Building2, User, AlertTriangle, CheckCircle2, Clock, ArrowRight, ScrollText } from 'lucide-react';
+import { Users, FolderKanban, ShieldCheck, Award, Activity, Building2, User, AlertTriangle, CheckCircle2, Clock, ArrowRight, ScrollText } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import type { Profile, Project, VerificationRequest } from '@/lib/types';
@@ -21,7 +21,6 @@ export default function AdminDashboard() {
     verifiers: 0,
     partners: 0,
     passportsIssued: 0,
-    totalFunding: 0,
     pendingApprovals: 0,
     draftProjects: 0,
     rejectedProjects: 0,
@@ -71,9 +70,6 @@ export default function AdminDashboard() {
         });
       }
 
-      const { data: funding } = await supabase.from('project_support').select('amount_usd').eq('status', 'completed');
-      const totalFunding = funding?.reduce((sum: number, r: any) => sum + (r.amount_usd || 0), 0) ?? 0;
-
       const { count: passportCount } = await supabase.from('carbon_passports').select('id', { count: 'exact', head: true });
 
       const { data: partnerships } = await supabase.from('project_partnerships').select('status');
@@ -92,7 +88,6 @@ export default function AdminDashboard() {
         verifiers,
         partners,
         passportsIssued: passportCount || 0,
-        totalFunding,
         pendingApprovals,
         draftProjects,
         rejectedProjects,
@@ -152,14 +147,14 @@ export default function AdminDashboard() {
         <KpiCard label="Total Users" value={stats.totalUsers} hint="Registered profiles" icon={Users} />
         <KpiCard label="Active Projects" value={stats.activeProjects} hint="Verified or active" icon={FolderKanban} />
         <KpiCard label="Pending Verifications" value={stats.pendingVerifications} hint="Requires attention" icon={ShieldCheck} />
-        <KpiCard label="Total Support" value={`$${stats.totalFunding.toLocaleString()}`} hint="Committed" icon={DollarSign} />
+        <KpiCard label="Total Partnerships" value={stats.totalPartnerships} hint="Monitoring agreements" icon={Building2} />
       </div>
 
       {/* Secondary KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Project Owners" value={stats.projectOwners} hint="Active accounts" icon={User} />
         <KpiCard label="Verifiers" value={stats.verifiers} hint="Registered verifiers" icon={Building2} />
-        <KpiCard label="Partners" value={stats.partners} hint="Active supporters" icon={Award} />
+        <KpiCard label="Partners" value={stats.partners} hint="Active partners" icon={Award} />
         <KpiCard label="Passports Issued" value={stats.passportsIssued} hint="Total verified" icon={Activity} />
       </div>
 

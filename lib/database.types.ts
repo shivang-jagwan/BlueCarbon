@@ -29,6 +29,7 @@ export interface Database {
           survey_number: string | null;
           land_registry_url: string | null;
           cover_image_url: string | null;
+          land_verification_status: string;
           health_score: number | null;
           center_lat: number | null;
           center_lng: number | null;
@@ -62,6 +63,16 @@ export interface Database {
           description: string | null;
           metadata: Json | null;
           created_at: string;
+          organization_id: string | null;
+          company_id: string | null;
+          related_document_id: string | null;
+          related_report_id: string | null;
+          related_verification_id: string | null;
+          related_partnership_id: string | null;
+          activity_status: string | null;
+          actor_name: string | null;
+          actor_role: string | null;
+          organization_name: string | null;
         };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;

@@ -17,7 +17,7 @@ export const EVENT_COLORS: Record<string, string> = {
   project_deadline: 'bg-destructive',
   meeting: 'bg-primary',
   reminder: 'bg-warning',
-  support_review: 'bg-emerald-500',
+  partner_review: 'bg-emerald-500',
   ngo_visit: 'bg-teal-500',
   custom: 'bg-muted-foreground',
 };

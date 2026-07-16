@@ -5,9 +5,8 @@ import { supabase } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SupportProjectModal } from '@/components/shared/SupportProjectModal';
 import { SaveProjectButton } from '@/components/shared/SaveProjectButton';
-import { MapPin, TrendingUp, Ruler, ShieldCheck, ArrowRight, Bookmark, Clock, Globe } from 'lucide-react';
+import { MapPin, TrendingUp, Ruler, ShieldCheck, Bookmark, Clock, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -35,10 +34,6 @@ export default function SavedProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = React.useState<ProjectWithProfile[]>([]);
   const [loading, setLoading] = React.useState(true);
-
-  // Modal State
-  const [supportModalOpen, setSupportModalOpen] = React.useState(false);
-  const [selectedProject, setSelectedProject] = React.useState<ProjectWithProfile | null>(null);
 
   const fetchSavedProjects = React.useCallback(async () => {
     if (!user) return;
@@ -79,7 +74,7 @@ export default function SavedProjectsPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Saved Projects</h1>
           <p className="mt-2 text-muted-foreground">
-            Projects you&apos;ve bookmarked for future evaluation or support.
+            Projects you&apos;ve bookmarked for future evaluation.
           </p>
         </div>
         {projects.length > 0 && (
@@ -104,7 +99,7 @@ export default function SavedProjectsPage() {
           <div className="max-w-sm">
             <h3 className="font-semibold text-lg">No saved projects</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              You haven&apos;t bookmarked any projects yet. Head over to the Discovery Hub to find projects to support.
+              You haven&apos;t bookmarked any projects yet. Head over to the Discovery Hub to find projects.
             </p>
           </div>
           <Button asChild className="mt-2">
@@ -196,28 +191,12 @@ export default function SavedProjectsPage() {
                         View Details
                       </Link>
                     </Button>
-                    <Button 
-                      className="flex-1" 
-                      onClick={() => { setSelectedProject(project); setSupportModalOpen(true); }}
-                    >
-                      Support <ArrowRight className="ml-1.5 h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
               </Card>
             );
           })}
         </div>
-      )}
-
-      {selectedProject && (
-        <SupportProjectModal 
-          isOpen={supportModalOpen}
-          onClose={() => { setSupportModalOpen(false); setSelectedProject(null); }}
-          projectId={selectedProject.id}
-          projectName={selectedProject.name}
-          ownerId={selectedProject.owner_id}
-        />
       )}
     </div>
   );

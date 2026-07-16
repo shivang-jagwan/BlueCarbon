@@ -161,7 +161,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, initialDate, eventTo
                   <SelectItem value="project_deadline">Project Deadline</SelectItem>
                   <SelectItem value="meeting">Meeting</SelectItem>
                   <SelectItem value="reminder">Reminder</SelectItem>
-                  <SelectItem value="support_review">Support Review</SelectItem>
+                  <SelectItem value="partner_review">Partner Review</SelectItem>
                   <SelectItem value="ngo_visit">NGO Visit</SelectItem>
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>

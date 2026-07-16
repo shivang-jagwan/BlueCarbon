@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, ExternalLink, Archive, Ban, Trash2, MapPin, DollarSign, Activity, Loader2, Download, TreePine } from 'lucide-react';
+import { Search, MoreHorizontal, ExternalLink, Archive, Ban, Trash2, MapPin, Activity, Loader2, Download, TreePine } from 'lucide-react';
 import { ProjectStatus } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -53,7 +53,6 @@ type ProjectWithProfile = {
   location_lng: number | null;
   area_hectares: number | null;
   health_score: number | null;
-  funding_goal: number | null;
   created_at: string;
   profiles: {
     full_name: string | null;
@@ -70,7 +69,7 @@ export default function ProjectManagementPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('projects')
-      .select('id, name, status, location_lat, location_lng, area_hectares, health_score, funding_goal, created_at, profiles:owner_id(full_name, organization)')
+      .select('id, name, status, location_lat, location_lng, area_hectares, health_score, created_at, profiles:owner_id(full_name, organization)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -146,7 +145,6 @@ export default function ProjectManagementPage() {
                 <TableHead className="hidden md:table-cell">Location & Area</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden lg:table-cell">Health Score</TableHead>
-                <TableHead className="hidden lg:table-cell">Support Goal</TableHead>
                 <TableHead className="hidden md:table-cell">Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -178,7 +176,6 @@ export default function ProjectManagementPage() {
                     ? `${proj.location_lat.toFixed(2)}, ${proj.location_lng.toFixed(2)}` 
                     : 'Location TBD';
                   const areaStr = proj.area_hectares ? `${proj.area_hectares.toLocaleString()} ha` : 'Area TBD';
-                  const fundingStr = proj.funding_goal ? `$${proj.funding_goal.toLocaleString()}` : 'N/A';
 
                   return (
                     <TableRow key={proj.id}>
@@ -213,12 +210,6 @@ export default function ProjectManagementPage() {
                         ) : (
                           <span className="text-sm text-muted-foreground">N/A</span>
                         )}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm">{fundingStr}</span>
-                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                         {proj.created_at ? format(new Date(proj.created_at), 'MMM d, yyyy') : 'N/A'}

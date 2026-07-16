@@ -37,9 +37,10 @@ export type ProjectType =
 
 export type OwnershipType = 'private' | 'government' | 'community' | 'leased';
 
+export type LandVerificationStatus = 'not_requested' | 'requested' | 'verified' | 'rejected';
+
 export type MonitoringStatus = 'draft' | 'submitted' | 'reviewed' | 'approved';
 
-export type SupportStatus = 'pending' | 'active' | 'completed' | 'terminated';
 
 export interface Profile {
   id: string;
@@ -120,6 +121,7 @@ export interface Project {
   survey_number: string | null;
   land_registry_url: string | null;
   cover_image_url: string | null;
+  land_verification_status: LandVerificationStatus;
   health_score: number | null;
   center_lat: number | null;
   center_lng: number | null;
@@ -155,16 +157,6 @@ export interface MonitoringReport {
   created_at: string;
 }
 
-export interface ProjectSupport {
-  id: string;
-  project_id: string;
-  partner_id: string;
-  amount_usd: number;
-  carbon_credits_tonnes: number | null;
-  status: SupportStatus;
-  created_at: string;
-}
-
 export interface NotificationItem {
   id: string;
   user_id: string;
@@ -185,7 +177,82 @@ export interface ProjectActivity {
   description: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  organization_id: string | null;
+  company_id: string | null;
+  related_document_id: string | null;
+  related_report_id: string | null;
+  related_verification_id: string | null;
+  related_partnership_id: string | null;
+  activity_status: string | null;
+  actor_name: string | null;
+  actor_role: string | null;
+  organization_name: string | null;
 }
+
+export type ActivityType =
+  | 'project_created'
+  | 'project_updated'
+  | 'project_submitted'
+  | 'project_archived'
+  | 'boundary_created'
+  | 'boundary_updated'
+  | 'boundary_change_requested'
+  | 'document_submitted'
+  | 'document_verified'
+  | 'document_rejected'
+  | 'documents_requested'
+  | 'additional_documents_uploaded'
+  | 'ownership_documents_uploaded'
+  | 'ownership_documents_submitted'
+  | 'ownership_verified'
+  | 'ownership_rejected'
+  | 'evidence_uploaded'
+  | 'evidence_approved'
+  | 'evidence_rejected'
+  | 'land_verification_requested'
+  | 'land_verification_approved'
+  | 'land_verification_rejected'
+  | 'project_verification_requested'
+  | 'project_verification_approved'
+  | 'project_verification_rejected'
+  | 'verification_requested'
+  | 'verification_approved'
+  | 'verification_rejected'
+  | 'verification_started'
+  | 'verifier_assigned'
+  | 'verification_organization_accepted'
+  | 'verification_organization_declined'
+  | 'monitoring_report_submitted'
+  | 'monitoring_report_approved'
+  | 'monitoring_report_rejected'
+  | 'monitoring_report_updated'
+  | 'monitoring_partnership_created'
+  | 'satellite_report_generated'
+  | 'drone_images_uploaded'
+  | 'drone_videos_uploaded'
+  | 'gallery_photos_uploaded'
+  | 'gallery_videos_uploaded'
+  | 'carbon_passport_issued'
+  | 'carbon_passport_revoked'
+  | 'carbon_passport_updated'
+  | 'carbon_report_generated'
+  | 'company_supported_project'
+  | 'company_removed_support'
+  | 'comments_added'
+  | 'comments_replied'
+  | 'audit_event'
+  | 'admin_override';
+
+export type ActivityCategory = 'all' | 'documents' | 'verifications' | 'monitoring' | 'gallery' | 'comments';
+
+export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
+  all: 'All Activity',
+  documents: 'Documents',
+  verifications: 'Verifications',
+  monitoring: 'Monitoring',
+  gallery: 'Gallery',
+  comments: 'Comments',
+};
 
 export type VerificationRequestType = 'land' | 'project' | 'corporate' | 'monthly';
 export type VerificationPriority = 'high' | 'medium' | 'low';
@@ -255,7 +322,7 @@ export interface DiscussionComment {
   created_at: string;
 }
 
-export type CalendarEventType = 'verification' | 'monthly_monitoring' | 'site_visit' | 'drone_survey' | 'project_deadline' | 'meeting' | 'reminder' | 'support_review' | 'ngo_visit' | 'custom';
+export type CalendarEventType = 'verification' | 'monthly_monitoring' | 'site_visit' | 'drone_survey' | 'project_deadline' | 'meeting' | 'reminder' | 'ngo_visit' | 'custom';
 export type CalendarEventStatus = 'upcoming' | 'completed' | 'cancelled' | 'overdue';
 export type CalendarEventPriority = 'high' | 'medium' | 'low';
 
@@ -354,6 +421,33 @@ export const OWNERSHIP_TYPE_LABELS: Record<OwnershipType, string> = {
   community: 'Community',
   leased: 'Leased',
 };
+
+export const LAND_VERIFICATION_STATUS_LABELS: Record<LandVerificationStatus, string> = {
+  not_requested: 'Not Requested',
+  requested: 'Verification Requested',
+  verified: 'Land Verified',
+  rejected: 'Rejected',
+};
+
+export function landVerificationColor(status: LandVerificationStatus): string {
+  const map: Record<LandVerificationStatus, string> = {
+    not_requested: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    requested: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    verified: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  };
+  return map[status] || map.not_requested;
+}
+
+export function landVerificationDot(status: LandVerificationStatus): string {
+  const map: Record<LandVerificationStatus, string> = {
+    not_requested: 'bg-slate-400',
+    requested: 'bg-amber-500',
+    verified: 'bg-green-500',
+    rejected: 'bg-red-500',
+  };
+  return map[status] || map.not_requested;
+}
 
 export const MONITORING_STATUS_LABELS: Record<MonitoringStatus, string> = {
   draft: 'Draft',
@@ -1174,4 +1268,215 @@ export const SECURITY_EVENT_LABELS: Record<SecurityEventType, string> = {
   rate_limit_exceeded: 'Rate Limit Exceeded',
   suspicious_ip: 'Suspicious IP',
   concurrent_session: 'Concurrent Session',
+};
+
+// ============================================================
+// WORKSPACE ENHANCEMENT TYPES
+// ============================================================
+
+export type VerificationType = 'land' | 'project' | 'monitoring' | 'carbon';
+export type VerificationRecordStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested';
+export type DocumentCategory =
+  | 'land_ownership' | 'government_approval' | 'environmental_clearance'
+  | 'lease_agreement' | 'community_certificate' | 'project_proposal'
+  | 'restoration_plan' | 'survey_document' | 'gis_report' | 'carbon_report'
+  | 'other';
+export type DocumentWorkflowStatus =
+  | 'draft' | 'uploaded' | 'submitted' | 'under_review'
+  | 'verified' | 'rejected' | 'revision_requested';
+export type GalleryMediaType = 'image' | 'video';
+export type ReportType = 'monthly' | 'inspection' | 'drone' | 'satellite' | 'carbon' | 'health';
+export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface VerificationHistory {
+  id: string;
+  project_id: string;
+  verification_type: VerificationType;
+  organization_id: string | null;
+  organization_name: string | null;
+  verifier_id: string | null;
+  verifier_name: string | null;
+  status: VerificationRecordStatus;
+  decision_date: string | null;
+  comments: string | null;
+  documents_reviewed: number;
+  evidence_count: number;
+  report_url: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ProjectDocumentV2 {
+  id: string;
+  project_id: string;
+  uploaded_by: string;
+  version: number;
+  replaced_by: string | null;
+  category: DocumentCategory;
+  document_name: string;
+  description: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  storage_path: string;
+  public_url: string | null;
+  status: DocumentWorkflowStatus;
+  submitted_at: string | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  verification_comments: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectAlbum {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  cover_image_url: string | null;
+  item_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectGalleryItem {
+  id: string;
+  project_id: string;
+  album_id: string | null;
+  uploaded_by: string | null;
+  uploader_name: string | null;
+  media_type: GalleryMediaType;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  storage_path: string;
+  public_url: string | null;
+  caption: string | null;
+  capture_date: string | null;
+  location_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  tags: string[] | null;
+  created_at: string;
+}
+
+export interface ProjectChangeRequest {
+  id: string;
+  project_id: string;
+  requested_by: string;
+  field_name: string;
+  current_value: string | null;
+  proposed_value: string;
+  reason: string | null;
+  status: ChangeRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectContact {
+  id: string;
+  project_id: string;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  organization: string | null;
+  address: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
+  land_ownership: 'Land Ownership',
+  government_approval: 'Government Approvals',
+  environmental_clearance: 'Environmental Clearance',
+  lease_agreement: 'Lease Agreements',
+  community_certificate: 'Community Certificates',
+  project_proposal: 'Project Proposal',
+  restoration_plan: 'Restoration Plan',
+  survey_document: 'Survey Documents',
+  gis_report: 'GIS Reports',
+  carbon_report: 'Carbon Reports',
+  other: 'Other Documents',
+};
+
+export const DOCUMENT_STATUS_LABELS: Record<DocumentWorkflowStatus, string> = {
+  draft: 'Draft',
+  uploaded: 'Uploaded',
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  verified: 'Verified',
+  rejected: 'Rejected',
+  revision_requested: 'Revision Requested',
+};
+
+export function documentStatusColor(status: DocumentWorkflowStatus): string {
+  const map: Record<DocumentWorkflowStatus, string> = {
+    draft: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    uploaded: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    submitted: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    under_review: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    verified: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    revision_requested: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  };
+  return map[status] || map.draft;
+}
+
+export const VERIFICATION_TYPE_LABELS: Record<VerificationType, string> = {
+  land: 'Land Verification',
+  project: 'Project Verification',
+  monitoring: 'Monitoring Verification',
+  carbon: 'Carbon Verification',
+};
+
+export function verificationRecordStatusColor(status: VerificationRecordStatus): string {
+  const map: Record<VerificationRecordStatus, string> = {
+    pending: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    in_review: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    changes_requested: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  };
+  return map[status] || map.pending;
+}
+
+export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
+  monthly: 'Monthly Report',
+  inspection: 'Inspection Report',
+  drone: 'Drone Report',
+  satellite: 'Satellite Report',
+  carbon: 'Carbon Report',
+  health: 'Health Report',
+};
+
+export const CHANGE_REQUEST_STATUS_LABELS: Record<ChangeRequestStatus, string> = {
+  pending: 'Pending Review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
+export const IMMUTABLE_FIELDS = [
+  'boundary_geojson', 'area_hectares', 'perimeter_km',
+  'ownership_type', 'center_lat', 'center_lng',
+  'survey_number', 'project_type', 'created_at',
+] as const;
+
+export const IMMUTABLE_FIELD_LABELS: Record<string, string> = {
+  boundary_geojson: 'Project Boundary',
+  area_hectares: 'Project Area',
+  perimeter_km: 'Perimeter',
+  ownership_type: 'Ownership Type',
+  center_lat: 'Center Latitude',
+  center_lng: 'Center Longitude',
+  survey_number: 'Survey Number',
+  project_type: 'Ecosystem Type',
+  created_at: 'Registration Date',
 };

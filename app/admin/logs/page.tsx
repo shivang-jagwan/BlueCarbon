@@ -53,7 +53,6 @@ export default function ActivityLogsPage() {
         details: row.title || row.description || '',
         type: row.event_type.includes('project') ? 'project' :
               row.event_type.includes('verif') ? 'verification' :
-              row.event_type.includes('fund') ? 'funding' :
               row.event_type.includes('passport') ? 'passport' :
               row.event_type.includes('user') ? 'auth' : 'activity',
         created_at: row.created_at,
@@ -100,7 +99,6 @@ export default function ActivityLogsPage() {
                 <SelectItem value="all">All Actions</SelectItem>
                 <SelectItem value="project">Projects</SelectItem>
                 <SelectItem value="verification">Verifications</SelectItem>
-                <SelectItem value="funding">Support</SelectItem>
                 <SelectItem value="passport">Passports</SelectItem>
                 <SelectItem value="activity">Other</SelectItem>
               </SelectContent>
