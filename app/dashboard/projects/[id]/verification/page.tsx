@@ -5,8 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useProject } from '@/hooks/use-projects';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
-import { getActiveApplicationForProject, submitApplication, getVerificationAgencies } from '@/lib/voc-services';
+import { getActiveApplicationForProject, submitApplication, getVerificationAgencies, getSelectedAgency, saveSelectedAgency } from '@/lib/voc-services';
 import type { VerificationAgency } from '@/lib/voc-types';
+import { AgencySelectorModal } from '@/components/verification/AgencySelectorModal';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -42,6 +43,7 @@ import {
   CheckCircle2,
   Lock,
   Shield,
+  ShieldCheck,
   Clock,
   Eye,
   Award,
@@ -269,98 +271,73 @@ function Step1ProjectSummary({ project }: { project: any }) {
 }
 
 function Step2AgencySelection({
-  agencies,
   selectedAgency,
   onSelect,
+  onOpenModal,
 }: {
-  agencies: VerificationAgency[];
   selectedAgency: VerificationAgency | null;
   onSelect: (agency: VerificationAgency) => void;
+  onOpenModal: () => void;
 }) {
-  const [search, setSearch] = React.useState('');
-
-  const filtered = React.useMemo(() => {
-    if (!search) return agencies;
-    const q = search.toLowerCase();
-    return agencies.filter(a =>
-      a.name.toLowerCase().includes(q) || a.location.toLowerCase().includes(q)
-    );
-  }, [agencies, search]);
-
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label className="text-sm font-medium">Select Verification Agency</Label>
+        <Label className="text-sm font-medium">Choose Verification Agency</Label>
         <p className="text-xs text-muted-foreground">
-          Choose an NGO to handle the verification of your project. This cannot be changed after submission.
+          Select a certified agency to review and verify your project. This cannot be changed after submission.
         </p>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search agencies by name or location..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-        {filtered.map((agency) => {
-          const isSelected = selectedAgency?.id === agency.id;
-          return (
-            <button
-              key={agency.id}
-              onClick={() => onSelect(agency)}
-              className={cn(
-                'w-full text-left rounded-xl border-2 p-4 transition-all',
-                isSelected
-                  ? 'border-primary bg-primary/5 shadow-sm'
-                  : 'border-border/60 hover:border-primary/40 hover:bg-muted/30',
-              )}
-            >
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground">{agency.name}</p>
-                    {agency.verification_status === 'active' && (
-                      <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-0">Active</Badge>
-                    )}
-                    {agency.verification_status === 'pending' && (
-                      <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0">Pending</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                      {agency.rating.toFixed(1)}
-                    </span>
-                    <span>{agency.projects_verified} projects verified</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {agency.location}
-                    </span>
-                  </div>
-                </div>
-                {isSelected && (
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <CheckCircle className="h-4 w-4" />
-                  </div>
+      {selectedAgency ? (
+        <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800 p-5">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/50">
+              <Building2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Selected Verification Agency</p>
+              <p className="text-base font-semibold text-foreground mt-0.5">{selectedAgency.name}</p>
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                {selectedAgency.verification_status === 'active' && (
+                  <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 gap-0.5">
+                    <ShieldCheck className="h-3 w-3" /> Government Verified
+                  </Badge>
                 )}
+                <span>{selectedAgency.projects_certified} projects certified</span>
+                <span>{selectedAgency.avg_verification_days}d avg</span>
               </div>
-            </button>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="text-center py-8 text-sm text-muted-foreground">
-            No agencies match your search.
+              <div className="flex flex-wrap gap-1 mt-2">
+                {selectedAgency.expertise.map(exp => (
+                  <Badge key={exp} variant="secondary" className="text-[10px] px-1.5 py-0">{exp}</Badge>
+                ))}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" size="sm" onClick={onOpenModal} className="gap-1.5">
+              Change Agency
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={onOpenModal}
+          className="w-full rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-8 text-center hover:border-primary/50 hover:bg-primary/10 transition-all"
+        >
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Choose Verification Agency</p>
+              <p className="text-xs text-muted-foreground mt-1">Browse and select a certified agency to verify your project</p>
+            </div>
+            <Badge variant="outline" className="text-xs gap-1">
+              <ShieldCheck className="h-3 w-3" /> Required before submission
+            </Badge>
+          </div>
+        </button>
+      )}
     </div>
   );
 }
@@ -790,8 +767,8 @@ function Step5Review({
   selectedAgency: VerificationAgency | null;
 }) {
   const totalDocs = projectDocuments.length + additionalDocs.length;
-  const imageCount = galleryItems.filter((g) => g.type === 'image').length;
-  const videoCount = galleryItems.filter((g) => g.type === 'video').length;
+  const imageCount = galleryItems.filter((g) => (g.media_type || g.type) === 'image').length;
+  const videoCount = galleryItems.filter((g) => (g.media_type || g.type) === 'video').length;
 
   const reviewSections = [
     { label: 'Project Name', value: project?.name || '—' },
@@ -884,12 +861,24 @@ export default function VerificationSubmitPage() {
   const [submittedApp, setSubmittedApp] = React.useState<VerificationApplication | null>(null);
   const [uploadingDoc, setUploadingDoc] = React.useState(false);
   const [uploadingEvidence, setUploadingEvidence] = React.useState(false);
-  const [selectedAgency, setSelectedAgency] = React.useState<VerificationAgency | null>(null);
+  const [selectedAgency, setSelectedAgency] = React.useState<VerificationAgency | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = getSelectedAgency();
+      return saved || null;
+    }
+    return null;
+  });
   const [agencies, setAgencies] = React.useState<VerificationAgency[]>([]);
+  const [agencyModalOpen, setAgencyModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     setAgencies(getVerificationAgencies());
   }, []);
+
+  function handleSelectAgency(agency: VerificationAgency) {
+    setSelectedAgency(agency);
+    saveSelectedAgency(agency);
+  }
 
   React.useEffect(() => {
     if (!projectId) return;
@@ -1150,9 +1139,9 @@ export default function VerificationSubmitPage() {
           {step === 1 && <Step1ProjectSummary project={project} />}
           {step === 2 && (
             <Step2AgencySelection
-              agencies={agencies}
               selectedAgency={selectedAgency}
-              onSelect={setSelectedAgency}
+              onSelect={handleSelectAgency}
+              onOpenModal={() => setAgencyModalOpen(true)}
             />
           )}
           {step === 3 && (

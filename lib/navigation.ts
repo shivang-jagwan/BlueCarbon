@@ -53,6 +53,7 @@ export const OWNER_NAV: NavSection[] = [
     title: 'Discover',
     items: [
       { label: 'Project Discovery', href: '/dashboard/discover', icon: Globe },
+      { label: 'Verification Agencies', href: '/dashboard/verification-agencies', icon: ShieldCheck },
       { label: 'Verifier Directory', href: '/dashboard/verifiers', icon: Building2 },
     ],
   },

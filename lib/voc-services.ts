@@ -192,6 +192,35 @@ export function getAgencyForProfile(profileId: string): VerificationAgency | und
   return MOCK_VERIFICATION_AGENCIES.find(a => a.profile_id === profileId);
 }
 
+// ── Selected Agency (localStorage) ──────────────────────────
+const SELECTED_AGENCY_KEY = 'carbonrush_selected_agency';
+
+export function getSelectedAgency(): VerificationAgency | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SELECTED_AGENCY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as VerificationAgency;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSelectedAgency(agency: VerificationAgency): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SELECTED_AGENCY_KEY, JSON.stringify(agency));
+  } catch { /* noop */ }
+}
+
+export function clearSelectedAgency(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(SELECTED_AGENCY_KEY);
+  } catch { /* noop */ }
+}
+
 // ── Queries ─────────────────────────────────────────────────
 export function getApplications(): VerificationApplication[] {
   return applications;

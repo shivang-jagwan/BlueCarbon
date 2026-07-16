@@ -32,15 +32,56 @@ export type SnapshotDocumentCategory =
   | 'other';
 
 // ── Verification Agency (NGO) ──────────────────────────────
+export type AgencyAvailability = 'accepting' | 'limited' | 'fully_booked';
+export type SortOption = 'experience' | 'projects' | 'speed' | 'newest' | 'alphabetical';
+
+export interface AgencyCertification {
+  name: string;
+  icon?: string;
+}
+
+export interface AgencyRecentProject {
+  project_name: string;
+  status: 'approved' | 'returned' | 'rejected';
+  date: string;
+}
+
 export interface VerificationAgency {
   id: string;
   profile_id: string;
   name: string;
   logo_url: string | null;
-  rating: number;
-  projects_verified: number;
-  location: string;
+  registration_number: string;
+  description: string;
+  mission: string;
+  founded_year: number;
+  headquarters: string;
+  operating_regions: string[];
+  countries_served: string[];
+  states_covered: string[];
+  expertise: string[];
+  services: string[];
+  supported_ecosystems: string[];
+  certifications: AgencyCertification[];
+  // Capacity metrics
+  projects_certified: number;
+  active_applications: number;
+  avg_verification_days: number;
+  years_of_operation: number;
+  available_audit_teams: number;
+  estimated_review_days: number;
+  // Availability
+  availability: AgencyAvailability;
   verification_status: 'active' | 'pending' | 'inactive';
+  // Fields for future architecture
+  profile_id_internal: string;
+  verifier_ids: string[];
+  audit_team_ids: string[];
+  regional_office_ids: string[];
+  accepts_new_applications: boolean;
+  paused: boolean;
+  // Recent projects
+  recent_projects: AgencyRecentProject[];
 }
 
 // ── Verification Application ────────────────────────────────
