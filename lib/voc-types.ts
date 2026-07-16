@@ -31,6 +31,18 @@ export type SnapshotDocumentCategory =
   | 'evidence'
   | 'other';
 
+// ── Verification Agency (NGO) ──────────────────────────────
+export interface VerificationAgency {
+  id: string;
+  profile_id: string;
+  name: string;
+  logo_url: string | null;
+  rating: number;
+  projects_verified: number;
+  location: string;
+  verification_status: 'active' | 'pending' | 'inactive';
+}
+
 // ── Verification Application ────────────────────────────────
 export interface VerificationApplication {
   id: string;
@@ -41,6 +53,9 @@ export interface VerificationApplication {
   project_owner_name: string;
   ngo_id: string;
   ngo_name: string;
+  verification_agency_id: string;
+  verification_agency_name: string;
+  assigned_at: string | null;
   verifier_id: string | null;
   verifier_name: string | null;
   submitted_date: string;

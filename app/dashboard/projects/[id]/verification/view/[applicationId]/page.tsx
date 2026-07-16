@@ -46,7 +46,7 @@ function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('text-sm font-medium', mono && 'font-mono')}>{value ?? '—'}</p>
+      <div className={cn('text-sm font-medium', mono && 'font-mono')}>{value ?? '—'}</div>
     </div>
   );
 }

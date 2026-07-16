@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useProject } from '@/hooks/use-projects';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
-import { getActiveApplicationForProject, submitApplication } from '@/lib/voc-services';
+import { getActiveApplicationForProject, submitApplication, getVerificationAgencies } from '@/lib/voc-services';
+import type { VerificationAgency } from '@/lib/voc-types';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -53,16 +54,22 @@ import {
   CalendarDays,
   Upload,
   Loader2,
+  Building2,
+  Star,
+  MapPin,
+  CheckCircle,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const STEPS = [
   { id: 1, label: 'Project Summary', icon: FileText },
-  { id: 2, label: 'Documents', icon: FolderOpen },
-  { id: 3, label: 'Evidence', icon: Camera },
-  { id: 4, label: 'Declaration', icon: Shield },
-  { id: 5, label: 'Review & Submit', icon: Send },
+  { id: 2, label: 'Select Agency', icon: Building2 },
+  { id: 3, label: 'Documents', icon: FolderOpen },
+  { id: 4, label: 'Evidence', icon: Camera },
+  { id: 5, label: 'Declaration', icon: Shield },
+  { id: 6, label: 'Review & Submit', icon: Send },
 ];
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
@@ -256,6 +263,103 @@ function Step1ProjectSummary({ project }: { project: any }) {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function Step2AgencySelection({
+  agencies,
+  selectedAgency,
+  onSelect,
+}: {
+  agencies: VerificationAgency[];
+  selectedAgency: VerificationAgency | null;
+  onSelect: (agency: VerificationAgency) => void;
+}) {
+  const [search, setSearch] = React.useState('');
+
+  const filtered = React.useMemo(() => {
+    if (!search) return agencies;
+    const q = search.toLowerCase();
+    return agencies.filter(a =>
+      a.name.toLowerCase().includes(q) || a.location.toLowerCase().includes(q)
+    );
+  }, [agencies, search]);
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label className="text-sm font-medium">Select Verification Agency</Label>
+        <p className="text-xs text-muted-foreground">
+          Choose an NGO to handle the verification of your project. This cannot be changed after submission.
+        </p>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search agencies by name or location..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+        {filtered.map((agency) => {
+          const isSelected = selectedAgency?.id === agency.id;
+          return (
+            <button
+              key={agency.id}
+              onClick={() => onSelect(agency)}
+              className={cn(
+                'w-full text-left rounded-xl border-2 p-4 transition-all',
+                isSelected
+                  ? 'border-primary bg-primary/5 shadow-sm'
+                  : 'border-border/60 hover:border-primary/40 hover:bg-muted/30',
+              )}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{agency.name}</p>
+                    {agency.verification_status === 'active' && (
+                      <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-0">Active</Badge>
+                    )}
+                    {agency.verification_status === 'pending' && (
+                      <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0">Pending</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                      {agency.rating.toFixed(1)}
+                    </span>
+                    <span>{agency.projects_verified} projects verified</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {agency.location}
+                    </span>
+                  </div>
+                </div>
+                {isSelected && (
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                )}
+              </div>
+            </button>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No agencies match your search.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -677,11 +781,13 @@ function Step5Review({
   projectDocuments,
   additionalDocs,
   galleryItems,
+  selectedAgency,
 }: {
   project: any;
   projectDocuments: SnapshotDocument[];
   additionalDocs: AdditionalDocument[];
   galleryItems: any[];
+  selectedAgency: VerificationAgency | null;
 }) {
   const totalDocs = projectDocuments.length + additionalDocs.length;
   const imageCount = galleryItems.filter((g) => g.type === 'image').length;
@@ -692,6 +798,7 @@ function Step5Review({
     { label: 'Project Type', value: PROJECT_TYPE_LABELS[project?.project_type] || '—' },
     { label: 'Area', value: project?.area_hectares ? `${project.area_hectares} ha` : '—' },
     { label: 'Location', value: project?.location_name || '—' },
+    { label: 'Verification Agency', value: selectedAgency?.name || '—' },
     { label: 'Total Documents', value: `${totalDocs} (${projectDocuments.length} existing + ${additionalDocs.length} additional)` },
     { label: 'Evidence Items', value: `${galleryItems.length} (${imageCount} images, ${videoCount} videos)` },
   ];
@@ -777,6 +884,12 @@ export default function VerificationSubmitPage() {
   const [submittedApp, setSubmittedApp] = React.useState<VerificationApplication | null>(null);
   const [uploadingDoc, setUploadingDoc] = React.useState(false);
   const [uploadingEvidence, setUploadingEvidence] = React.useState(false);
+  const [selectedAgency, setSelectedAgency] = React.useState<VerificationAgency | null>(null);
+  const [agencies, setAgencies] = React.useState<VerificationAgency[]>([]);
+
+  React.useEffect(() => {
+    setAgencies(getVerificationAgencies());
+  }, []);
 
   React.useEffect(() => {
     if (!projectId) return;
@@ -907,7 +1020,7 @@ export default function VerificationSubmitPage() {
   }
 
   async function handleSubmit() {
-    if (!project || !profile) return;
+    if (!project || !profile || !selectedAgency) return;
     setSubmitting(true);
 
     try {
@@ -940,8 +1053,10 @@ export default function VerificationSubmitPage() {
         projectName: project.name,
         projectOwnerId: project.owner_id,
         projectOwnerName: profile.full_name || '',
-        ngoId: '',
-        ngoName: '',
+        ngoId: selectedAgency.id,
+        ngoName: selectedAgency.name,
+        verificationAgencyId: selectedAgency.id,
+        verificationAgencyName: selectedAgency.name,
         snapshot,
         additionalDocuments: additionalDocs.map((d) => ({
           id: d.id,
@@ -1034,6 +1149,13 @@ export default function VerificationSubmitPage() {
         <CardContent>
           {step === 1 && <Step1ProjectSummary project={project} />}
           {step === 2 && (
+            <Step2AgencySelection
+              agencies={agencies}
+              selectedAgency={selectedAgency}
+              onSelect={setSelectedAgency}
+            />
+          )}
+          {step === 3 && (
             <Step2Documents
               projectDocuments={projectDocuments}
               additionalDocs={additionalDocs}
@@ -1043,14 +1165,15 @@ export default function VerificationSubmitPage() {
               uploading={uploadingDoc}
             />
           )}
-          {step === 3 && <Step3Evidence galleryItems={galleryItems} onUploadEvidence={handleUploadEvidence} uploading={uploadingEvidence} />}
-          {step === 4 && <Step4Declaration confirmed={confirmed} onConfirmChange={setConfirmed} />}
-          {step === 5 && (
+          {step === 4 && <Step3Evidence galleryItems={galleryItems} onUploadEvidence={handleUploadEvidence} uploading={uploadingEvidence} />}
+          {step === 5 && <Step4Declaration confirmed={confirmed} onConfirmChange={setConfirmed} />}
+          {step === 6 && (
             <Step5Review
               project={project}
               projectDocuments={projectDocuments}
               additionalDocs={additionalDocs}
               galleryItems={galleryItems}
+              selectedAgency={selectedAgency}
             />
           )}
         </CardContent>
@@ -1071,7 +1194,7 @@ export default function VerificationSubmitPage() {
           {step < 5 ? (
             <Button
               onClick={() => setStep((s) => s + 1)}
-              disabled={step === 4 && !confirmed}
+              disabled={(step === 2 && !selectedAgency) || (step === 5 && !confirmed)}
               className="gap-2"
             >
               Next

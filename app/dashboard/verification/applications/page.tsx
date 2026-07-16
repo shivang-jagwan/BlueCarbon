@@ -13,7 +13,8 @@ import {
   Search, ArrowRight, Clock, FileText, Shield, CheckCircle2, Eye, ClipboardCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getApplications } from '@/lib/voc-services';
+import { getApplications, getAgencyForProfile } from '@/lib/voc-services';
+import { useAuth } from '@/components/providers/auth-provider';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -33,12 +34,22 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 
 export default function VerificationApplicationsPage() {
   const router = useRouter();
-  const [applications] = React.useState<VerificationApplication[]>(getApplications());
+  const { profile } = useAuth();
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');
 
+  const allApplications = React.useMemo(() => {
+    const all = getApplications();
+    if (!profile) return all;
+    const agency = getAgencyForProfile(profile.id);
+    if (agency) {
+      return all.filter(app => app.verification_agency_id === agency.id);
+    }
+    return all;
+  }, [profile]);
+
   const filtered = React.useMemo(() => {
-    return applications.filter(app => {
+    return allApplications.filter(app => {
       const matchesSearch = search === '' ||
         app.application_number.toLowerCase().includes(search.toLowerCase()) ||
         app.project_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -47,7 +58,7 @@ export default function VerificationApplicationsPage() {
       const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [applications, search, statusFilter]);
+  }, [allApplications, search, statusFilter]);
 
   return (
     <div className="space-y-6">

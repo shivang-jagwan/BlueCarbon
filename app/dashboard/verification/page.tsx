@@ -18,7 +18,8 @@ import {
   FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getApplications, getApplicationsByStatus } from '@/lib/voc-services';
+import { getApplications, getApplicationsByStatus, getActiveApplicationsForAgency, getAgencyForProfile } from '@/lib/voc-services';
+import { useAuth } from '@/components/providers/auth-provider';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -44,22 +45,32 @@ const ACTIVE_STATUSES: ApplicationStatus[] = [
 
 export default function VOCDashboardPage() {
   const router = useRouter();
-  const [applications] = React.useState<VerificationApplication[]>(getApplications());
+  const { profile } = useAuth();
+
+  const allApplications = React.useMemo(() => {
+    const all = getApplications();
+    if (!profile) return all;
+    const agency = getAgencyForProfile(profile.id);
+    if (agency) {
+      return all.filter(app => app.verification_agency_id === agency.id);
+    }
+    return all;
+  }, [profile]);
 
   const counts = React.useMemo(() => {
     const c: Record<string, number> = {};
     KPI_CARDS.forEach((k) => {
-      c[k.status] = getApplicationsByStatus(k.status).length;
+      c[k.status] = allApplications.filter(a => a.status === k.status).length;
     });
     return c;
-  }, []);
+  }, [allApplications]);
 
-  const activeApplications = applications.filter((a) =>
+  const activeApplications = allApplications.filter((a) =>
     ACTIVE_STATUSES.includes(a.status)
   );
 
   const totalActive = activeApplications.length;
-  const totalCompleted = applications.filter((a) =>
+  const totalCompleted = allApplications.filter((a) =>
     ['approved', 'returned_for_revision', 'rejected'].includes(a.status)
   ).length;
   const approvalRate =
@@ -216,7 +227,7 @@ export default function VOCDashboardPage() {
                   Total Applications
                 </span>
                 <span className="text-sm font-semibold">
-                  {applications.length}
+                  {allApplications.length}
                 </span>
               </div>
               <div className="flex items-center justify-between">

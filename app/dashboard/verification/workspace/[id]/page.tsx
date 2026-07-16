@@ -15,10 +15,11 @@ import {
   ArrowLeft, FileText, Shield, Eye, Map, Camera, CheckCircle2, RotateCcw,
   XCircle, Calendar, Lock, Sparkles, MapPin, ClipboardCheck, AlertTriangle,
   AlertCircle, Check, Clock, Send, Gavel, MessageSquare, Award, Building2,
-  Image, Video, FileQuestion,
+  Image, Video, FileQuestion, Play,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getApplication, scheduleAudit, submitDecision } from '@/lib/voc-services';
+import { getApplication, scheduleAudit, submitDecision, startReview } from '@/lib/voc-services';
+import { useAuth } from '@/components/providers/auth-provider';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -44,6 +45,7 @@ export default function VerificationWorkspacePage() {
   const [reviewerNotes, setReviewerNotes] = React.useState('');
   const [submitted, setSubmitted] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const { profile } = useAuth();
 
   React.useEffect(() => {
     const app = getApplication(appId);
@@ -87,6 +89,13 @@ export default function VerificationWorkspacePage() {
 
   const handleAuditSchedule = () => {
     scheduleAudit(application.id, auditRequired, auditRequired === 'yes' ? auditDate : null, auditNotes);
+    const updated = getApplication(appId);
+    if (updated) setApplication(updated);
+  };
+
+  const handleStartReview = () => {
+    if (!profile) return;
+    startReview(application.id, profile.id, profile.full_name || 'Verifier');
     const updated = getApplication(appId);
     if (updated) setApplication(updated);
   };
@@ -360,6 +369,27 @@ export default function VerificationWorkspacePage() {
           </div>
         </CardContent>
       </Card>
+
+      {application.status === 'submitted' && (
+        <Card className="shadow-sm border-primary/30 bg-primary/5">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <Play className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">Ready to Review</h3>
+                  <p className="text-xs text-muted-foreground">Start reviewing this verification application to proceed with the certification workflow.</p>
+                </div>
+              </div>
+              <Button onClick={handleStartReview} className="gap-2">
+                <Play className="h-4 w-4" /> Start Review
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {canDecide && !isDecided && (
         <Card className="shadow-sm">
