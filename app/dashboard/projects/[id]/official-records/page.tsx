@@ -44,10 +44,16 @@ export default function OfficialRecordsPage() {
 
   React.useEffect(() => {
     if (!projectId) return;
-    setLoading(true);
-    const result = getOfficialRecordsForProject(projectId);
-    setRecords(result);
-    setLoading(false);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const result = await getOfficialRecordsForProject(projectId);
+      if (!cancelled) {
+        setRecords(result);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [projectId]);
 
   if (projectLoading || loading) {

@@ -77,8 +77,17 @@ export default function DocumentsPage() {
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { profile } = useAuth();
-  const activeApp = React.useMemo(() => getActiveApplicationForProject(projectId), [projectId]);
-  const isLocked = !!activeApp;
+  const [activeApp, setActiveApp] = React.useState<import('@/lib/voc-types').VerificationApplication | undefined>(undefined);
+  const isLocked = !!activeApp || project?.verification_status === 'approved';
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const app = await getActiveApplicationForProject(projectId);
+      if (!cancelled) setActiveApp(app);
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   const [documents, setDocuments] = React.useState<ProjectDocumentV2[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -147,7 +156,11 @@ export default function DocumentsPage() {
           <Lock className="h-5 w-5 text-amber-600 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-amber-800">Documents are locked</p>
-            <p className="text-xs text-amber-600">Verification Application {activeApp?.application_number} is under review. Upload, delete, and replace are disabled.</p>
+            <p className="text-xs text-amber-600">
+              {project?.verification_status === 'approved'
+                ? 'This project has been verified. Documents are read-only.'
+                : `Verification Application ${activeApp?.application_number} is under review. Upload, delete, and replace are disabled.`}
+            </p>
           </div>
         </div>
       )}

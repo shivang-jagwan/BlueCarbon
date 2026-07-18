@@ -43,9 +43,18 @@ const STATUS_COLORS: Record<OfficialRecord['status'], string> = {
 };
 
 export default function OfficialRecordsPage() {
-  const [records] = React.useState<OfficialRecord[]>(getOfficialRecords());
+  const [records, setRecords] = React.useState<OfficialRecord[]>([]);
   const [search, setSearch] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('all');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getOfficialRecords();
+      if (!cancelled) setRecords(data);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = React.useMemo(() => {
     return records.filter((r) => {

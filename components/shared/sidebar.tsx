@@ -145,7 +145,7 @@ export function Sidebar() {
         </div>
         {collapsed && (
           <Link href="/dashboard" className="mx-auto">
-            <Logo showText={false} />
+            <Logo />
           </Link>
         )}
       </div>

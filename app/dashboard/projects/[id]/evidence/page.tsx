@@ -39,18 +39,15 @@ import {
   Calendar,
   X,
   Play,
-  Lock,
+  Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getActiveApplicationForProject } from '@/lib/voc-services';
 
 export default function EvidencePage() {
   const params = useParams();
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { profile } = useAuth();
-  const activeApp = React.useMemo(() => getActiveApplicationForProject(projectId), [projectId]);
-  const isLocked = !!activeApp;
 
   const [albums, setAlbums] = React.useState<ProjectAlbum[]>([]);
   const [items, setItems] = React.useState<ProjectGalleryItem[]>([]);
@@ -113,12 +110,14 @@ export default function EvidencePage() {
 
   return (
     <div className="space-y-6">
-      {isLocked && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-          <Lock className="h-5 w-5 text-amber-600 shrink-0" />
+      {project?.verification_status === 'approved' && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+          <Info className="h-5 w-5 text-emerald-600 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-amber-800">Evidence is locked</p>
-            <p className="text-xs text-amber-600">Verification Application {activeApp?.application_number} is under review. Upload, delete, and replace are disabled.</p>
+            <p className="text-sm font-semibold text-emerald-800">Project Monitoring Gallery</p>
+            <p className="text-xs text-emerald-600">
+              Continue uploading photos and videos to document the ongoing progress of your verified project. These uploads are part of continuous monitoring and do not modify the previously verified evidence.
+            </p>
           </div>
         </div>
       )}
@@ -132,7 +131,7 @@ export default function EvidencePage() {
         </div>
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={isLocked}>
+            <Button className="bg-green-600 hover:bg-green-700 text-white">
               <Upload className="mr-2 h-4 w-4" />
               Upload Media
             </Button>

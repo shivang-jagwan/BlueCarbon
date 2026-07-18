@@ -22,6 +22,8 @@ const nextConfig = {
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
+              "object-src 'self' blob:",
+              "frame-src 'self' blob:",
               "worker-src 'self' blob:",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co https://api.maptiler.com https://nominatim.openstreetmap.org wss://*.supabase.co",

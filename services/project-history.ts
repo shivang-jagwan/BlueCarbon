@@ -154,6 +154,16 @@ export function getCategoryEventTypes(category: string): string[] {
       'verification_started',
       'verifier_assigned',
       'verification_organization_accepted', 'verification_organization_declined',
+      'verification_requests_sent',
+      'verification_application_submitted',
+      'verification_application_under_review',
+      'verification_audit_scheduled',
+      'verification_audit_completed',
+      'verification_application_approved',
+      'verification_application_returned',
+      'verification_application_rejected',
+      'agency_declined',
+      'agency_accepted',
       'audit_event',
     ],
     partnerships: [
@@ -186,6 +196,7 @@ export function getCategoryEventTypes(category: string): string[] {
     financial: [
       'company_supported_project', 'company_removed_support',
       'carbon_passport_issued', 'carbon_passport_revoked', 'carbon_passport_updated',
+      'carbon_passport_applied', 'carbon_passport_requested', 'carbon_passport_under_processing',
       'carbon_report_generated',
     ],
     project: [
@@ -260,6 +271,7 @@ export function getEventTypeLabel(eventType: string): string {
     comments_replied: 'Comment Replied',
     audit_event: 'Audit Event',
     admin_override: 'Admin Override',
+    verification_requests_sent: 'Verification Requests Sent',
     verification_application_submitted: 'Verification Application Submitted',
     verification_application_under_review: 'Application Under Review',
     verification_audit_scheduled: 'Audit Scheduled',
@@ -267,13 +279,18 @@ export function getEventTypeLabel(eventType: string): string {
     verification_application_approved: 'Verification Application Approved',
     verification_application_returned: 'Application Returned for Revision',
     verification_application_rejected: 'Verification Application Rejected',
+    agency_declined: 'Agency Declined Request',
+    agency_accepted: 'Agency Accepted Request',
+    carbon_passport_applied: 'Carbon Passport Application Submitted',
+    carbon_passport_requested: 'Carbon Passport Requested',
+    carbon_passport_under_processing: 'Carbon Passport Under Processing',
   };
   return labels[eventType] || eventType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function getEventCategory(eventType: string): string {
   const docEvents = ['document_submitted', 'document_verified', 'document_rejected', 'documents_requested', 'additional_documents_uploaded', 'ownership_documents_uploaded', 'ownership_documents_submitted', 'ownership_verified', 'ownership_rejected', 'evidence_uploaded', 'evidence_approved', 'evidence_rejected'];
-  const verifEvents = ['land_verification_requested', 'land_verification_approved', 'land_verification_rejected', 'project_verification_requested', 'project_verification_approved', 'project_verification_rejected', 'verification_requested', 'verification_approved', 'verification_rejected', 'verification_started', 'verifier_assigned', 'verification_organization_accepted', 'verification_organization_declined', 'audit_event', 'verification_application_submitted', 'verification_application_under_review', 'verification_audit_scheduled', 'verification_audit_completed', 'verification_application_approved', 'verification_application_returned', 'verification_application_rejected'];
+  const verifEvents = ['land_verification_requested', 'land_verification_approved', 'land_verification_rejected', 'project_verification_requested', 'project_verification_approved', 'project_verification_rejected', 'verification_requested', 'verification_approved', 'verification_rejected', 'verification_started', 'verifier_assigned', 'verification_organization_accepted', 'verification_organization_declined', 'verification_requests_sent', 'verification_application_submitted', 'verification_application_under_review', 'verification_audit_scheduled', 'verification_audit_completed', 'verification_application_approved', 'verification_application_returned', 'verification_application_rejected', 'agency_declined', 'agency_accepted', 'audit_event'];
   const partnerEvents = ['partnership_request_received', 'partnership_accepted', 'partnership_established', 'partnership_terminated', 'company_supported_project', 'company_removed_support', 'monitoring_partnership_created', 'new_verification_requested', 'monthly_report_shared'];
   const monEvents = ['monitoring_report_submitted', 'monitoring_report_approved', 'monitoring_report_rejected', 'monitoring_report_updated', 'satellite_report_generated', 'drone_images_uploaded', 'drone_videos_uploaded'];
   const galleryEvents = ['gallery_photos_uploaded', 'gallery_videos_uploaded', 'satellite_report_generated'];

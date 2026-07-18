@@ -55,10 +55,19 @@ const DECISION_OPTIONS: { value: string; label: string }[] = [
 
 export default function VerificationHistoryPage() {
   const router = useRouter();
-  const [applications] = React.useState<VerificationApplication[]>(getHistoryApplications);
+  const [applications, setApplications] = React.useState<VerificationApplication[]>([]);
   const [search, setSearch] = React.useState('');
   const [decisionFilter, setDecisionFilter] = React.useState('all');
   const [statusFilter, setStatusFilter] = React.useState('all');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getHistoryApplications();
+      if (!cancelled) setApplications(data);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = React.useMemo(() => {
     return applications.filter((app) => {

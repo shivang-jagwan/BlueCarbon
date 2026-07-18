@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -22,6 +23,37 @@ import { cn } from '@/lib/utils';
 
 export default function OrganizationEditPage() {
   const { profile, user, refreshProfile } = useAuth();
+  const router = useRouter();
+
+  // Verifiers: redirect to full agency profile editor
+  React.useEffect(() => {
+    if (profile?.role === 'verifier') {
+      let cancelled = false;
+      (async () => {
+        const { data } = await supabase
+          .from('verification_agencies')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .single();
+        if (!cancelled && data) {
+          router.replace(`/dashboard/verification-agencies/${data.id}/edit`);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+  }, [profile, router]);
+
+  if (profile?.role === 'verifier') {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center">
+          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Loading agency profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   const [saving, setSaving] = React.useState(false);
   const [services, setServices] = React.useState<string[]>([]);
 

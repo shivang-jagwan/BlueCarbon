@@ -54,7 +54,6 @@ export const OWNER_NAV: NavSection[] = [
     items: [
       { label: 'Project Discovery', href: '/dashboard/discover', icon: Globe },
       { label: 'Verification Agencies', href: '/dashboard/verification-agencies', icon: ShieldCheck },
-      { label: 'Verifier Directory', href: '/dashboard/verifiers', icon: Building2 },
     ],
   },
   {
@@ -73,8 +72,8 @@ export const VERIFIER_NAV: NavSection[] = [
   {
     title: 'Main',
     items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Verification Operations Center', href: '/dashboard/verification', icon: ShieldCheck },
+      { label: 'Carbon Passport Requests', href: '/dashboard/verification/passport-requests', icon: Award },
       { label: 'Monitoring Projects', href: '/dashboard/projects', icon: FolderKanban },
     ],
   },

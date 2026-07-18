@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Logo } from '@/components/shared/logo';
 import {
   ArrowRight,
   Menu,
@@ -132,17 +133,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-10">
-              <Link href="/" className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                  <svg viewBox="0 0 24 24" fill="none" className="h-4.5 w-4.5 text-primary-foreground" aria-hidden="true">
-                    <path d="M12 2C12 2 7 6 7 11C7 14 9 16 12 16C15 16 17 14 17 11C17 6 12 2 12 2Z" fill="currentColor" fillOpacity="0.9" />
-                    <path d="M3 18C3 18 6 16 9 18C12 20 12 20 15 18C18 16 21 18 21 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M3 21C3 21 6 19 9 21C12 23 12 23 15 21C18 19 21 21 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fillOpacity="0.6" />
-                  </svg>
-                </div>
-                <span className="font-display text-lg font-semibold tracking-tight">
-                  Carbon<span className="text-primary">Rush</span> AI
-                </span>
+              <Link href="/" className="flex items-center">
+                <Logo />
               </Link>
 
               <div className="hidden lg:flex items-center gap-1">
@@ -696,15 +688,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
             <div className="col-span-2">
               <Link href="/" className="inline-block mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-4.5 w-4.5 text-primary-foreground" aria-hidden="true">
-                      <path d="M12 2C12 2 7 6 7 11C7 14 9 16 12 16C15 16 17 14 17 11C17 6 12 2 12 2Z" fill="currentColor" fillOpacity="0.9" />
-                      <path d="M3 18C3 18 6 16 9 18C12 20 12 20 15 18C18 16 21 18 21 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <span className="font-display text-lg font-semibold text-gray-900">Carbon<span className="text-accent">Rush</span> AI</span>
-                </div>
+                <Logo />
               </Link>
               <p className="text-sm leading-relaxed max-w-xs mb-4">
                 The transparent MRV platform for blue carbon restoration projects.

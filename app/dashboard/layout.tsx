@@ -28,7 +28,7 @@ export default async function DashboardLayout({
     return (
       <div className="flex h-screen items-center justify-center bg-background px-4">
         <div className="flex max-w-md flex-col items-center gap-6 text-center">
-          <Logo showText={false} iconClassName="h-14 w-14" />
+          <Logo iconClassName="h-14 w-14" />
           <div className="space-y-2">
             <h1 className="font-display text-2xl font-semibold">Account Pending Approval</h1>
             <p className="text-sm text-muted-foreground">

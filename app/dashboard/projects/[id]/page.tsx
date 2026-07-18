@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useProject, useProjectActivity } from '@/hooks/use-projects';
+import { useProject } from '@/hooks/use-projects';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,228 +15,213 @@ import { useAuth } from '@/components/providers/auth-provider';
 import {
   MapPin, TrendingUp, HeartPulse, Building,
   Clock, CheckCircle2, AlertTriangle, ShieldCheck,
-  FileText, Leaf, Droplets, Wind, ArrowRight,
-  GitCompare, Calendar, Users, Eye
+  Leaf, Wind, GitCompare, Calendar,
+  Award, Layers, ChevronRight, Send, Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase/client';
 import {
   PROJECT_TYPE_LABELS,
   PROJECT_STATUS_LABELS,
-  VERIFICATION_STATUS_LABELS,
   statusColor,
-  type ProjectActivity,
 } from '@/lib/types';
 import { PartnershipInfoCard } from '@/components/workspace/PartnershipInfoCard';
 import { PartnershipLifecycleCard } from '@/components/workspace/PartnershipLifecycleCard';
+import { APPLICATION_STATUS_LABELS } from '@/lib/voc-types';
 import Link from 'next/link';
 
 /* ------------------------------------------------------------------ */
-/*  Verification Summary                                               */
+/*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-interface VerifRequest {
-  request_type: string;
-  status: string;
-  verifier_id: string;
-  profiles?: { full_name: string | null; organization: string | null } | null;
-}
-interface Partnership {
-  status: string;
-  verifier_id: string;
-  profiles?: { full_name: string | null; organization: string | null } | null;
+const AGENCY_STATUS_STYLES: Record<string, string> = {
+  approved: 'bg-emerald-50 border-emerald-200 hover:border-emerald-300',
+  rejected: 'bg-red-50 border-red-200 hover:border-red-300',
+  waiting: 'bg-amber-50 border-amber-200 hover:border-amber-300',
+  under_review: 'bg-blue-50 border-blue-200 hover:border-blue-300',
+  audit_scheduled: 'bg-purple-50 border-purple-200 hover:border-purple-300',
+  audit_completed: 'bg-cyan-50 border-cyan-200 hover:border-cyan-300',
+  returned_for_revision: 'bg-orange-50 border-orange-200 hover:border-orange-300',
+};
+
+const AGENCY_STATUS_BADGE: Record<string, string> = {
+  approved: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-red-100 text-red-700',
+  waiting: 'bg-amber-100 text-amber-700',
+  under_review: 'bg-blue-100 text-blue-700',
+  audit_scheduled: 'bg-purple-100 text-purple-700',
+  audit_completed: 'bg-cyan-100 text-cyan-700',
+  returned_for_revision: 'bg-orange-100 text-orange-700',
+};
+
+/* ------------------------------------------------------------------ */
+/*  Verification Reports List (multi-agency)                           */
+/* ------------------------------------------------------------------ */
+
+interface AgencyRequestRow {
+  id: string;
+  request_id: string;
+  agency_name: string;
+  agency_id: string;
+  verification_status: string;
+  assigned_verifier: string | null;
+  audit_date: string | null;
+  last_updated: string | null;
+  carbon_passport_status: string | null;
 }
 
-function StatusDot({ status }: { status: string }) {
-  const colorMap: Record<string, string> = {
-    approved: 'bg-green-500',
-    verified: 'bg-green-500',
-    active: 'bg-green-500',
-    pending: 'bg-amber-500',
-    in_review: 'bg-blue-500',
-    rejected: 'bg-red-500',
-  };
-  return (
-    <span className={cn('inline-block h-2 w-2 rounded-full', colorMap[status] || 'bg-slate-400')} />
-  );
-}
-
-function VerificationSummary({ projectId }: { projectId: string }) {
-  const [verifRequests, setVerifRequests] = React.useState<VerifRequest[]>([]);
-  const [partnerships, setPartnerships] = React.useState<Partnership[]>([]);
+function VerificationReportsList({ projectId, isOwner }: { projectId: string; isOwner: boolean }) {
+  const [agencyRequests, setAgencyRequests] = React.useState<AgencyRequestRow[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    Promise.all([
-      supabase
-        .from('verification_service_requests')
-        .select('request_type, status, verifier_id, profiles!verification_requests_verifier_id_fkey(full_name, organization)')
-        .eq('project_id', projectId),
-      supabase
-        .from('project_partnerships')
-        .select('status, verifier_id, profiles!project_partnerships_verifier_id_fkey(full_name, organization)')
-        .eq('project_id', projectId),
-    ]).then(([reqRes, partRes]) => {
-      setVerifRequests((reqRes.data as VerifRequest[]) || []);
-      setPartnerships((partRes.data as Partnership[]) || []);
+    (async () => {
+      const { data: requests } = await supabase
+        .from('voc_requests')
+        .select('id')
+        .eq('project_id', projectId);
+
+      if (requests && requests.length > 0) {
+        const requestIds = requests.map((r: any) => r.id);
+        const { data: apps } = await supabase
+          .from('voc_agency_requests')
+          .select('id, request_id, agency_name, agency_id, verification_status, assigned_verifier, audit_date, last_updated, carbon_passport_status')
+          .in('request_id', requestIds)
+          .order('created_at', { ascending: false });
+        setAgencyRequests(apps || []);
+      }
       setLoading(false);
-    });
+    })();
   }, [projectId]);
 
   if (loading) {
     return (
       <Card className="p-6 shadow-sm border-border/60 space-y-4">
         <Skeleton className="h-5 w-48" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-3 w-full mt-2" />
+        {[1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-4 p-4 rounded-lg border">
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        ))}
       </Card>
     );
   }
 
-  const landVerifs = verifRequests.filter((r) => r.request_type === 'land');
-  const projectVerifs = verifRequests.filter((r) => r.request_type === 'project');
-  const activeMonitoring = partnerships.filter((p) => p.status === 'active');
-
-  const landCount = landVerifs.length || 0;
-  const projectCount = projectVerifs.length || 0;
-  const monitoringCount = activeMonitoring.length || 0;
-
-  const allVerifs = [...landVerifs, ...projectVerifs];
-  const approvedCount = allVerifs.filter((v) => v.status === 'approved').length;
-  const totalVerifs = allVerifs.length || 1;
-  const progress = Math.min(Math.round((approvedCount / totalVerifs) * 100), 100);
-
-  const monitoringOrg = activeMonitoring[0]?.profiles;
-
-  return (
-    <Card className="p-6 shadow-sm border-border/60">
-      <h2 className="font-display text-xl font-semibold mb-4">Verification Summary</h2>
-      <div className="space-y-4">
-        {/* Land Verification */}
-        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-          <div>
-            <p className="text-sm font-medium">Land Verification</p>
-            <p className="text-xs text-muted-foreground">
-              {landCount} {landCount === 1 ? 'Organization' : 'Organizations'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <StatusDot status={landVerifs[0]?.status || 'not_submitted'} />
-            <span className="text-xs font-medium">
-              {landVerifs[0]?.status ? VERIFICATION_STATUS_LABELS[landVerifs[0].status as keyof typeof VERIFICATION_STATUS_LABELS] || landVerifs[0].status : 'Not Requested'}
-            </span>
-          </div>
-        </div>
-
-        {/* Project Verification */}
-        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-          <div>
-            <p className="text-sm font-medium">Project Verification</p>
-            <p className="text-xs text-muted-foreground">
-              {projectCount} {projectCount === 1 ? 'Organization' : 'Organizations'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <StatusDot status={projectVerifs[0]?.status || 'not_submitted'} />
-            <span className="text-xs font-medium">
-              {projectVerifs[0]?.status ? VERIFICATION_STATUS_LABELS[projectVerifs[0].status as keyof typeof VERIFICATION_STATUS_LABELS] || projectVerifs[0].status : 'Not Requested'}
-            </span>
-          </div>
-        </div>
-
-        {/* Monitoring Organization */}
-        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-          <div>
-            <p className="text-sm font-medium">Monitoring Organization</p>
-            <p className="text-xs text-muted-foreground">
-              {monitoringOrg?.organization || monitoringOrg?.full_name || 'No monitoring partner'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <StatusDot status={activeMonitoring.length > 0 ? 'active' : 'not_submitted'} />
-            <span className="text-xs font-medium">
-              {activeMonitoring.length > 0 ? 'Active' : 'None'}
-            </span>
-          </div>
-        </div>
-
-        {/* Verification Progress */}
-        <div className="pt-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Verification Progress</span>
-            <span className="text-sm font-semibold text-primary">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Timeline Summary (replaces RecentActivityCard)                     */
-/* ------------------------------------------------------------------ */
-
-function TimelineSummary({ projectId }: { projectId: string }) {
-  const { activities, loading } = useProjectActivity(projectId);
-  const display = activities.slice(0, 6);
-
   return (
     <Card className="p-6 shadow-sm border-border/60">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-xl font-semibold">Timeline</h2>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/dashboard/projects/${projectId}/timeline`}>
-            View Full Timeline <ArrowRight className="h-4 w-4 ml-1" />
-          </Link>
-        </Button>
-      </div>
-      {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex gap-3">
-              <Skeleton className="h-3 w-3 rounded-full mt-1.5 shrink-0" />
-              <div className="flex-1 space-y-1">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-            </div>
-          ))}
+        <div>
+          <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+            <Layers className="h-5 w-5 text-primary" /> Verification Reports
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            {agencyRequests.length} {agencyRequests.length === 1 ? 'verification' : 'verifications'} recorded for this project
+          </p>
         </div>
-      ) : display.length === 0 ? (
-        <div className="relative border-l-2 border-border ml-3 space-y-6">
-          <div className="relative pl-6">
-            <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-primary ring-4 ring-background" />
-            <p className="text-sm font-medium">Project Registered</p>
-            <p className="text-xs text-muted-foreground mt-0.5">No activity yet</p>
-          </div>
+        {isOwner && (
+          <Button size="sm" asChild className="bg-green-600 hover:bg-green-700 text-white">
+            <Link href={`/dashboard/projects/${projectId}/verification`}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Request New Verification
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      {agencyRequests.length === 0 ? (
+        <div className="text-center py-8 border border-dashed rounded-lg">
+          <ShieldCheck className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">No verification records yet</p>
+          {isOwner && (
+            <Button size="sm" variant="outline" className="mt-3" asChild>
+              <Link href={`/dashboard/projects/${projectId}/verification`}>
+                <Send className="mr-1.5 h-3.5 w-3.5" /> Request Verification
+              </Link>
+            </Button>
+          )}
         </div>
       ) : (
-        <div className="relative border-l-2 border-border ml-3 space-y-6">
-          {display.map((activity, idx) => (
-            <div key={activity.id} className="relative pl-6">
-              <div
-                className={cn(
-                  'absolute -left-[9px] top-1 h-4 w-4 rounded-full ring-4 ring-background',
-                  idx === 0 ? 'bg-primary' : 'bg-muted border-2 border-border'
+        <div className="space-y-3">
+          {agencyRequests.map((req) => {
+            const statusKey = req.verification_status || 'waiting';
+            const isClickable = ['approved', 'returned_for_revision', 'rejected'].includes(statusKey);
+            const cardContent = (
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                  statusKey === 'approved' ? 'bg-emerald-100' : statusKey === 'rejected' ? 'bg-red-100' : 'bg-slate-100'
+                )}>
+                  {statusKey === 'approved' ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  ) : statusKey === 'rejected' ? (
+                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <ShieldCheck className="h-5 w-5 text-slate-500" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold truncate">{req.agency_name}</p>
+                    <Badge className={cn('text-[10px] border-0', AGENCY_STATUS_BADGE[statusKey] || 'bg-slate-100 text-slate-600')}>
+                      {APPLICATION_STATUS_LABELS[statusKey as keyof typeof APPLICATION_STATUS_LABELS] || statusKey}
+                    </Badge>
+                    {req.carbon_passport_status && req.carbon_passport_status !== 'none' && (
+                      <Badge className="text-[10px] border-0 bg-blue-100 text-blue-700">
+                        <Award className="mr-0.5 h-2.5 w-2.5" /> Passport
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                    {req.assigned_verifier && (
+                      <span>Verifier: {req.assigned_verifier}</span>
+                    )}
+                    {req.audit_date && (
+                      <>
+                        <span>•</span>
+                        <span>Audit: {new Date(req.audit_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </>
+                    )}
+                    {req.last_updated && (
+                      <>
+                        <span>•</span>
+                        <span>Updated: {new Date(req.last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {isClickable && (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 )}
-              />
-              <p className="text-sm font-medium">{activity.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {new Date(activity.created_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </p>
-              {activity.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                  {activity.description}
-                </p>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+
+            return isClickable ? (
+              <Link
+                key={req.id}
+                href={`/dashboard/projects/${projectId}/verification/view/${req.id}`}
+                className={cn(
+                  'block p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer',
+                  AGENCY_STATUS_STYLES[statusKey] || 'bg-white border-slate-200 hover:border-slate-300'
+                )}
+              >
+                {cardContent}
+              </Link>
+            ) : (
+              <div
+                key={req.id}
+                className={cn(
+                  'p-4 rounded-xl border',
+                  AGENCY_STATUS_STYLES[statusKey] || 'bg-white border-slate-200'
+                )}
+              >
+                {cardContent}
+              </div>
+            );
+          })}
         </div>
       )}
     </Card>
@@ -255,7 +240,6 @@ export default function ProjectOverviewPage() {
   const { profile } = useAuth();
 
   const [projectData, setProjectData] = React.useState<any>(null);
-  const [relatedProjects, setRelatedProjects] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (!projectId) return;
@@ -266,21 +250,6 @@ export default function ProjectOverviewPage() {
       .single()
       .then(({ data }: { data: any }) => setProjectData(data));
   }, [projectId]);
-
-  React.useEffect(() => {
-    const p = projectData || project;
-    if (!p) return;
-    (async () => {
-      const { data } = await supabase
-        .from('projects')
-        .select('id, name, project_type, location_name')
-        .neq('id', p.id)
-        .or(`project_type.eq.${p.project_type},country.eq.${p.country}`)
-        .in('status', ['registered', 'verified', 'active'])
-        .limit(3);
-      setRelatedProjects(data || []);
-    })();
-  }, [projectData, project]);
 
   if (loading && !projectData) {
     return (
@@ -293,12 +262,24 @@ export default function ProjectOverviewPage() {
   const p = projectData || project;
   if (!p) return null;
 
+  const isVerified = p.verification_status === 'approved';
   const ownerProfile = p.profiles;
   const isPartner = profile?.role === 'sustainability_partner';
+  const isOwner = profile?.id === p.owner_id;
 
+  // Verified project layout
+  if (isVerified) {
+    return (
+      <div className="space-y-6 pb-20">
+        {/* Verification Reports — single source of truth */}
+        <VerificationReportsList projectId={projectId} isOwner={isOwner} />
+      </div>
+    );
+  }
+
+  // Unverified / In-progress project layout
   return (
     <div className="space-y-6 pb-20">
-      {/* Top Actions (Partner Only) */}
       {isPartner && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-card p-4 rounded-xl border shadow-sm">
           <div className="flex-1">
@@ -321,9 +302,7 @@ export default function ProjectOverviewPage() {
         </div>
       )}
 
-      {/* Main Grid Layout */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
           {/* About Section */}
           <Card className="p-6 shadow-sm border-border/60">
@@ -375,55 +354,13 @@ export default function ProjectOverviewPage() {
             </div>
           </Card>
 
-          {/* Verification Summary */}
-          <VerificationSummary projectId={projectId} />
+          {/* Verification Reports — always visible */}
+          <VerificationReportsList projectId={projectId} isOwner={isOwner} />
 
-          {/* Project Relationships */}
           <ProjectRelationshipCard project={p} />
-
-          {/* Environmental Impact Estimates */}
-          <Card className="p-6 shadow-sm border-border/60">
-            <h2 className="font-display text-xl font-semibold mb-4">Estimated Environmental Impact</h2>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="flex flex-col items-center p-4 text-center border rounded-xl bg-gradient-to-b from-blue-500/10 to-transparent">
-                <Droplets className="h-8 w-8 text-blue-500 mb-3" />
-                <h4 className="font-semibold">Carbon Sequestration</h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {p.verified_carbon_tonnes
-                    ? `${p.verified_carbon_tonnes.toLocaleString()} t verified`
-                    : p.target_carbon_tonnes
-                      ? `${p.target_carbon_tonnes.toLocaleString()} t targeted`
-                      : 'Awaiting data'}
-                </p>
-              </div>
-              <div className="flex flex-col items-center p-4 text-center border rounded-xl bg-gradient-to-b from-emerald-500/10 to-transparent">
-                <Leaf className="h-8 w-8 text-emerald-500 mb-3" />
-                <h4 className="font-semibold">Habitat Area</h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {p.area_hectares
-                    ? `${p.area_hectares.toLocaleString()} hectares`
-                    : 'Awaiting survey'}
-                </p>
-              </div>
-              <div className="flex flex-col items-center p-4 text-center border rounded-xl bg-gradient-to-b from-cyan-500/10 to-transparent">
-                <Wind className="h-8 w-8 text-cyan-500 mb-3" />
-                <h4 className="font-semibold">Project Duration</h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {p.start_date
-                    ? `Started ${new Date(p.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
-                    : 'Not yet started'}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Timeline Summary */}
-          <TimelineSummary projectId={projectId} />
         </div>
 
-        {/* Right Column (1/3 width) */}
         <div className="space-y-6">
-          {/* Health & Verification Status */}
           <Card className="p-6 bg-primary/5 border-primary/20 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold flex items-center gap-2">
@@ -450,21 +387,33 @@ export default function ProjectOverviewPage() {
                 />
               </>
             )}
-            <div className="bg-background rounded-lg p-3 text-xs text-muted-foreground flex items-start gap-2 border">
-              <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
-              <p>
-                This project is currently seeking verification. Once verified, a Carbon Passport will be issued.
-              </p>
-            </div>
+            {isVerified ? (
+              <div className="bg-green-50 rounded-lg p-3 text-xs text-green-700 flex items-start gap-2 border border-green-200">
+                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                <p>
+                  This project has been verified. A Carbon Passport can be issued upon request.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-background rounded-lg p-3 text-xs text-muted-foreground flex items-start gap-2 border">
+                <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                <p>
+                  This project is currently seeking verification. Once verified, a Carbon Passport will be issued.
+                </p>
+              </div>
+            )}
+            {isOwner && (
+              <Button size="sm" className="w-full mt-3" asChild>
+                <Link href={`/dashboard/projects/${projectId}/verification`}>
+                  <Send className="mr-1.5 h-3.5 w-3.5" /> Request Verification
+                </Link>
+              </Button>
+            )}
           </Card>
 
-          {/* Partnership Lifecycle */}
           <PartnershipLifecycleCard project={p as any} />
-
-          {/* Partnership Details */}
           <PartnershipInfoCard project={p as any} />
 
-          {/* Owner Profile */}
           <Card className="p-6 shadow-sm border-border/60">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Building className="h-4 w-4" /> Project Owner
@@ -494,36 +443,8 @@ export default function ProjectOverviewPage() {
               Coming Soon
             </Button>
           </Card>
-
-          {/* Recommended Projects */}
-          {isPartner && relatedProjects.length > 0 && (
-            <Card className="p-6 shadow-sm border-border/60">
-              <h3 className="font-semibold mb-4 text-sm">Similar Projects</h3>
-              <div className="space-y-3">
-                {relatedProjects.map((rp) => (
-                  <Link key={rp.id} href={`/dashboard/projects/${rp.id}`} className="block group">
-                    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors border border-transparent hover:border-border">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        {(PROJECT_TYPE_LABELS[rp.project_type as keyof typeof PROJECT_TYPE_LABELS] as string)?.[0] ||
-                          'P'}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                          {rp.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {rp.location_name || 'View Details'}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          )}
         </div>
       </div>
-
     </div>
   );
 }

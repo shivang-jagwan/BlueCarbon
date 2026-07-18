@@ -51,18 +51,26 @@ export interface VerificationAgency {
   profile_id: string;
   name: string;
   logo_url: string | null;
+  cover_image: string | null;
   registration_number: string;
   description: string;
   mission: string;
+  vision: string;
   founded_year: number;
   headquarters: string;
   operating_regions: string[];
   countries_served: string[];
   states_covered: string[];
+  districts: string[];
   expertise: string[];
   services: string[];
   supported_ecosystems: string[];
   certifications: AgencyCertification[];
+  // Contact
+  website: string;
+  email: string;
+  phone: string;
+  social_links: Record<string, string>;
   // Capacity metrics
   projects_certified: number;
   active_applications: number;
@@ -84,6 +92,65 @@ export interface VerificationAgency {
   recent_projects: AgencyRecentProject[];
 }
 
+// ── Agency Service (Service Catalog) ──────────────────────────
+export type AgencyServiceCategory =
+  | 'verification'
+  | 'audit'
+  | 'consulting'
+  | 'monitoring'
+  | 'mapping'
+  | 'training'
+  | 'certification'
+  | 'assessment'
+  | 'other';
+
+export type AgencyServicePriceUnit =
+  | 'per_project'
+  | 'per_hectare'
+  | 'per_day'
+  | 'per_hour'
+  | 'per_audit'
+  | 'fixed'
+  | 'custom';
+
+export interface AgencyService {
+  id: string;
+  agency_id: string;
+  name: string;
+  description: string;
+  category: AgencyServiceCategory;
+  price: number;
+  currency: string;
+  price_unit: AgencyServicePriceUnit;
+  estimated_duration_days: number | null;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const AGENCY_SERVICE_CATEGORY_LABELS: Record<AgencyServiceCategory, string> = {
+  verification: 'Verification',
+  audit: 'Field Audit',
+  consulting: 'Consulting',
+  monitoring: 'Monitoring',
+  mapping: 'Mapping & Survey',
+  training: 'Training',
+  certification: 'Certification',
+  assessment: 'Assessment',
+  other: 'Other',
+};
+
+export const AGENCY_SERVICE_PRICE_UNIT_LABELS: Record<AgencyServicePriceUnit, string> = {
+  per_project: 'per project',
+  per_hectare: 'per hectare',
+  per_day: 'per day',
+  per_hour: 'per hour',
+  per_audit: 'per audit',
+  fixed: 'fixed price',
+  custom: 'custom',
+};
+
 // ── Verification Application ────────────────────────────────
 export interface VerificationApplication {
   id: string;
@@ -101,7 +168,7 @@ export interface VerificationApplication {
   verifier_name: string | null;
   submitted_date: string;
   status: ApplicationStatus;
-  snapshot: ProjectSnapshot;
+  snapshot: ProjectSnapshot | null;
   // Audit
   field_audit_required: FieldAuditRequired;
   audit_date: string | null;
@@ -157,6 +224,8 @@ export interface SnapshotDocument {
   gps_available: boolean;
   metadata_available: boolean;
   ai_summary: AIAnalysisSummary;
+  url?: string;
+  storage_path?: string;
 }
 
 export interface SnapshotEvidence {
@@ -166,6 +235,10 @@ export interface SnapshotEvidence {
   type: string;
   location: string;
   date_collected: string;
+  url?: string;
+  storage_path?: string;
+  file_type?: string;
+  file_name?: string;
 }
 
 // ── AI Analysis ─────────────────────────────────────────────
@@ -212,6 +285,33 @@ export interface AuditReport {
   remarks: string;
   final_observation: string;
   generated_at: string;
+  // Land Verification
+  land_ownership_verified: boolean;
+  boundary_verified: boolean;
+  // Tree Assessment
+  dominant_species: string;
+  avg_tree_height: number;
+  tree_health_condition: string;
+  // Carbon Assessment
+  estimated_carbon_stock: number;
+  biomass_estimate: number;
+  soil_carbon_sample: number;
+  carbon_methodology: string;
+  // Biodiversity
+  biodiversity_index: number;
+  wildlife_observed: string;
+  invasive_species_found: boolean;
+  ecosystem_condition: string;
+  // Site Inspection
+  access_road_condition: string;
+  water_source_nearby: string;
+  nearby_land_use: string;
+  community_impact: string;
+  // Audit Evidence
+  samples_collected: number;
+  // Risks
+  risks: string;
+  corrective_actions: string;
 }
 
 // ── Carbon Passport ─────────────────────────────────────────
@@ -353,4 +453,133 @@ export const OFFICIAL_RECORD_TYPE_LABELS: Record<OfficialRecord['record_type'], 
   ngo_approval: 'NGO Approval Letter',
   supporting_document: 'Supporting Document',
   verification_history: 'Verification History',
+};
+
+// ── Multi-Agency Verification Requests ─────────────────────
+
+export type AgencyRequestStatus = 'sent' | 'accepted' | 'declined';
+
+export type AgencyVerificationStatus =
+  | 'waiting'
+  | 'under_review'
+  | 'audit_scheduled'
+  | 'audit_completed'
+  | 'approved'
+  | 'returned'
+  | 'rejected';
+
+export interface AgencyRequest {
+  agencyId: string;
+  agencyName: string;
+  requestStatus: AgencyRequestStatus;
+  verificationStatus: AgencyVerificationStatus;
+  assignedVerifier: string | null;
+  auditDate: string | null;
+  lastUpdated: string;
+  carbonPassportStatus: CarbonPassportStatus;
+}
+
+export interface VerificationRequest {
+  id: string;
+  requestNumber: string;
+  projectId: string;
+  projectName: string;
+  projectOwnerId: string;
+  projectOwnerName: string;
+  selectedAgencies: AgencyRequest[];
+  snapshot?: ProjectSnapshot;
+  createdAt: string;
+}
+
+export const AGENCY_REQUEST_STATUS_LABELS: Record<AgencyRequestStatus, string> = {
+  sent: 'Invitation Sent',
+  accepted: 'Accepted',
+  declined: 'Declined',
+};
+
+export const AGENCY_REQUEST_STATUS_COLORS: Record<AgencyRequestStatus, string> = {
+  sent: 'bg-blue-100 text-blue-700',
+  accepted: 'bg-emerald-100 text-emerald-700',
+  declined: 'bg-red-100 text-red-700',
+};
+
+export const AGENCY_REQUEST_STATUS_DOT_COLORS: Record<AgencyRequestStatus, string> = {
+  sent: 'bg-blue-500',
+  accepted: 'bg-emerald-500',
+  declined: 'bg-red-500',
+};
+
+export const AGENCY_VERIFICATION_STATUS_LABELS: Record<AgencyVerificationStatus, string> = {
+  waiting: 'Waiting for Response',
+  under_review: 'Under Review',
+  audit_scheduled: 'Audit Scheduled',
+  audit_completed: 'Audit Completed',
+  approved: 'Approved',
+  returned: 'Returned for Revision',
+  rejected: 'Rejected',
+};
+
+export const AGENCY_VERIFICATION_STATUS_COLORS: Record<AgencyVerificationStatus, string> = {
+  waiting: 'bg-slate-100 text-slate-600',
+  under_review: 'bg-indigo-100 text-indigo-700',
+  audit_scheduled: 'bg-purple-100 text-purple-700',
+  audit_completed: 'bg-cyan-100 text-cyan-700',
+  approved: 'bg-emerald-100 text-emerald-700',
+  returned: 'bg-amber-100 text-amber-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+export const AGENCY_VERIFICATION_STATUS_DOT_COLORS: Record<AgencyVerificationStatus, string> = {
+  waiting: 'bg-slate-400',
+  under_review: 'bg-indigo-500',
+  audit_scheduled: 'bg-purple-500',
+  audit_completed: 'bg-cyan-500',
+  approved: 'bg-emerald-500',
+  returned: 'bg-amber-500',
+  rejected: 'bg-red-500',
+};
+
+// ── Carbon Passport Applications ───────────────────────────
+
+export type CarbonPassportStatus = 'none' | 'requested' | 'under_processing' | 'issued';
+
+export interface CarbonPassportApplication {
+  id: string;
+  requestId: string;
+  agencyId: string;
+  agencyName: string;
+  projectId: string;
+  projectName: string;
+  projectOwnerId: string;
+  status: CarbonPassportStatus;
+  assignedVerifier: string | null;
+  verificationReportRef: string | null;
+  auditReportRef: string | null;
+  certificateUrl: string | null;
+  passportNumber: string | null;
+  qrCodeData: string | null;
+  digitalSignature: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CARBON_PASSPORT_STATUS_LABELS: Record<CarbonPassportStatus, string> = {
+  none: 'Not Applied',
+  requested: 'Passport Requested',
+  under_processing: 'Under Processing',
+  issued: 'Passport Issued',
+};
+
+export const CARBON_PASSPORT_STATUS_COLORS: Record<CarbonPassportStatus, string> = {
+  none: 'bg-slate-100 text-slate-600',
+  requested: 'bg-amber-100 text-amber-700',
+  under_processing: 'bg-blue-100 text-blue-700',
+  issued: 'bg-emerald-100 text-emerald-700',
+};
+
+export const CARBON_PASSPORT_STATUS_DOT_COLORS: Record<CarbonPassportStatus, string> = {
+  none: 'bg-slate-400',
+  requested: 'bg-amber-500',
+  under_processing: 'bg-blue-500',
+  issued: 'bg-emerald-500',
 };

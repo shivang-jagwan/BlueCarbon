@@ -65,11 +65,44 @@ export const OWNER_WORKSPACE_NAV: WorkspaceNavSection[] = [
   {
     title: 'Settings',
     items: [
-      { label: 'Carbon Passport', href: '/passport', icon: Award },
       { label: 'Project Settings', href: '/settings', icon: Settings },
     ],
   },
 ];
+
+export function getOwnerWorkspaceNav(verificationStatus?: string): WorkspaceNavSection[] {
+  const isVerified = verificationStatus === 'approved';
+  return [
+    {
+      title: 'Project',
+      items: [
+        { label: 'Overview', href: '', icon: LayoutDashboard },
+        { label: 'Project History', href: '/timeline', icon: History },
+      ],
+    },
+    {
+      title: 'Verification',
+      items: [
+        { label: 'Request New Verification', href: '/verification', icon: Send },
+        { label: 'Official Records', href: '/official-records', icon: Award },
+      ],
+    },
+    {
+      title: 'Monitoring',
+      items: [
+        { label: 'Project Gallery', href: '/evidence', icon: Image },
+        { label: 'Monitoring', href: '/monitoring', icon: ClipboardList },
+        { label: 'Reports', href: '/reports', icon: BarChart3 },
+      ],
+    },
+    {
+      title: 'Settings',
+      items: isVerified ? [] : [
+        { label: 'Project Settings', href: '/settings', icon: Settings },
+      ],
+    },
+  ];
+}
 
 export const VERIFIER_WORKSPACE_NAV: WorkspaceNavSection[] = [
   {
@@ -116,7 +149,6 @@ export const PARTNER_WORKSPACE_NAV: WorkspaceNavSection[] = [
     items: [
       { label: 'Documents', href: '/documents', icon: FolderOpen },
       { label: 'Reports', href: '/reports', icon: FileBarChart },
-      { label: 'Carbon Passport', href: '/passport', icon: Award },
     ],
   },
   {
@@ -127,7 +159,7 @@ export const PARTNER_WORKSPACE_NAV: WorkspaceNavSection[] = [
   },
 ];
 
-export function getWorkspaceNavForRole(role: AppRole | null): WorkspaceNavSection[] {
+export function getWorkspaceNavForRole(role: AppRole | null, verificationStatus?: string): WorkspaceNavSection[] {
   switch (role) {
     case 'verifier':
       return VERIFIER_WORKSPACE_NAV;
@@ -135,6 +167,6 @@ export function getWorkspaceNavForRole(role: AppRole | null): WorkspaceNavSectio
       return PARTNER_WORKSPACE_NAV;
     case 'project_owner':
     default:
-      return OWNER_WORKSPACE_NAV;
+      return getOwnerWorkspaceNav(verificationStatus);
   }
 }

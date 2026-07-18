@@ -34,7 +34,15 @@ interface AgencySelectorModalProps {
 
 export function AgencySelectorModal({ open, onOpenChange, onSelect, selectedAgency }: AgencySelectorModalProps) {
   const router = useRouter();
-  const allAgencies = React.useMemo(() => getVerificationAgencies(), []);
+  const [allAgencies, setAllAgencies] = React.useState<VerificationAgency[]>([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getVerificationAgencies();
+      if (!cancelled) setAllAgencies(data);
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [search, setSearch] = React.useState('');
   const [countryFilter, setCountryFilter] = React.useState('all');
   const [expertiseFilter, setExpertiseFilter] = React.useState('all');

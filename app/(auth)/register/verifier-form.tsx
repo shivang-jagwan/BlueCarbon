@@ -181,6 +181,34 @@ export default function VerifierRegisterForm() {
           kyc_status: 'submitted',
           profile_completed: true,
         });
+
+        await supabase.from('verification_agencies').insert({
+          profile_id: data.user.id,
+          name: values.organization_name,
+          registration_number: values.registration_number,
+          description: `${values.organization_name} is a ${values.organization_type || 'verification agency'} registered on CarbonRush AI.`,
+          mission: `Providing reliable ${services.join(', ').toLowerCase() || 'verification'} services for blue carbon projects.`,
+          founded_year: new Date().getFullYear(),
+          headquarters: [values.district, values.state, values.country].filter(Boolean).join(', '),
+          operating_regions: values.state ? [values.state] : [],
+          countries_served: values.country ? [values.country] : [],
+          states_covered: values.state ? [values.state] : [],
+          expertise: services.length > 0 ? services : ['Carbon Certification'],
+          services: services.length > 0 ? services : ['Field Audit'],
+          supported_ecosystems: ['Mangroves', 'Wetlands', 'Blue Carbon'],
+          certifications: [],
+          availability: 'accepting',
+          verification_status: 'active',
+          accepts_new_applications: true,
+          paused: false,
+          projects_certified: 0,
+          active_applications: 0,
+          avg_verification_days: 14,
+          years_of_operation: 0,
+          available_audit_teams: 1,
+          estimated_review_days: 14,
+          recent_projects: [],
+        });
       }
       
       // We don't automatically sign in verifiers because they wait for admin approval

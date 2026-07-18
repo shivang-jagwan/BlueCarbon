@@ -14,12 +14,11 @@ import { Separator } from '@/components/ui/separator';
 import {
   Search, ShieldCheck, Building2, MapPin, Globe, Clock,
   CheckCircle2, ArrowRight, Briefcase, Users, CalendarClock,
-  Filter, ChevronDown, ChevronUp,
+  Filter, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getVerificationAgencies, saveSelectedAgency } from '@/lib/voc-services';
-import type { VerificationAgency, AgencyAvailability, SortOption } from '@/lib/voc-types';
-import { toast } from 'sonner';
+import { getVerificationAgencies, getActiveAgencyServices } from '@/lib/voc-services';
+import type { VerificationAgency, AgencyAvailability, SortOption, AgencyService } from '@/lib/voc-types';
 
 const AVAILABILITY_CONFIG: Record<AgencyAvailability, { label: string; color: string; dot: string }> = {
   accepting: { label: 'Accepting Applications', color: 'text-emerald-700 bg-emerald-50', dot: 'bg-emerald-500' },
@@ -35,16 +34,22 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'alphabetical', label: 'Alphabetical' },
 ];
 
-function AgencyCard({ agency, onOpen, onSelectAgency }: { agency: VerificationAgency; onOpen: () => void; onSelectAgency: (a: VerificationAgency) => void }) {
+function AgencyCard({ agency, services, onOpen }: { agency: VerificationAgency; services: AgencyService[]; onOpen: () => void }) {
   const avail = AVAILABILITY_CONFIG[agency.availability];
   const currentYear = new Date().getFullYear();
+  const activeServices = services.filter(s => s.is_active);
+  const minPrice = activeServices.length > 0 ? Math.min(...activeServices.map(s => s.price)) : null;
 
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow border-slate-200 dark:border-slate-800">
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <Building2 className="h-7 w-7 text-primary" />
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 overflow-hidden">
+            {agency.logo_url ? (
+              <img src={agency.logo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <Building2 className="h-7 w-7 text-primary" />
+            )}
           </div>
           <div className="flex-1 min-w-0 space-y-3">
             <div className="space-y-1">
@@ -69,6 +74,20 @@ function AgencyCard({ agency, onOpen, onSelectAgency }: { agency: VerificationAg
                 <Badge key={exp} variant="secondary" className="text-[10px] px-2 py-0.5">{exp}</Badge>
               ))}
             </div>
+
+            {/* Services preview */}
+            {activeServices.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" /> {activeServices.length} service{activeServices.length !== 1 ? 's' : ''}
+                </span>
+                {minPrice !== null && (
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" /> From ${minPrice.toLocaleString()}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="rounded-lg bg-muted/50 p-2.5">
@@ -98,11 +117,6 @@ function AgencyCard({ agency, onOpen, onSelectAgency }: { agency: VerificationAg
                 <Button variant="outline" size="sm" onClick={onOpen} className="gap-1.5 text-xs h-8">
                   View Organization <ArrowRight className="h-3 w-3" />
                 </Button>
-                {agency.availability !== 'fully_booked' && (
-                  <Button size="sm" onClick={() => onSelectAgency(agency)} className="gap-1.5 text-xs h-8">
-                    <CheckCircle2 className="h-3 w-3" /> Select Agency
-                  </Button>
-                )}
               </div>
             </div>
           </div>
@@ -114,7 +128,29 @@ function AgencyCard({ agency, onOpen, onSelectAgency }: { agency: VerificationAg
 
 export default function VerificationAgenciesPage() {
   const router = useRouter();
-  const allAgencies = React.useMemo(() => getVerificationAgencies(), []);
+  const [allAgencies, setAllAgencies] = React.useState<VerificationAgency[]>([]);
+  const [servicesMap, setServicesMap] = React.useState<Record<string, AgencyService[]>>({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getVerificationAgencies();
+      if (cancelled) return;
+      setAllAgencies(data);
+
+      // Load services for each agency in parallel
+      const entries = await Promise.all(
+        data.map(async (a) => {
+          const svc = await getActiveAgencyServices(a.id);
+          return [a.id, svc] as const;
+        })
+      );
+      if (!cancelled) {
+        setServicesMap(Object.fromEntries(entries));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const [search, setSearch] = React.useState('');
   const [countryFilter, setCountryFilter] = React.useState('all');
@@ -177,17 +213,6 @@ export default function VerificationAgenciesPage() {
 
   const activeFilterCount = [countryFilter, stateFilter, expertiseFilter, availabilityFilter]
     .filter(f => f !== 'all').length;
-
-  function handleSelectAgency(agency: VerificationAgency) {
-    saveSelectedAgency(agency);
-    toast.success(`${agency.name} selected as your verification agency.`, {
-      description: 'You can now submit a verification application to this agency.',
-      action: {
-        label: 'View',
-        onClick: () => router.push(`/dashboard/verification-agencies/${agency.id}`),
-      },
-    });
-  }
 
   return (
     <div className="space-y-6">
@@ -306,8 +331,8 @@ export default function VerificationAgenciesPage() {
           <AgencyCard
             key={agency.id}
             agency={agency}
+            services={servicesMap[agency.id] || []}
             onOpen={() => router.push(`/dashboard/verification-agencies/${agency.id}`)}
-            onSelectAgency={handleSelectAgency}
           />
         ))}
         {filtered.length === 0 && (

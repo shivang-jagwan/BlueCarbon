@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Calendar as CalendarIcon, Clock, AlertTriangle, CheckCircle2, FileText,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Loader2, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getCalendarEvents } from '@/lib/voc-services';
 import type { VOCCalendarEvent } from '@/lib/voc-types';
 
 const EVENT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -34,8 +35,21 @@ function generateCalendarDays(year: number, month: number) {
 }
 
 export default function VOCCalendarPage() {
-  const [currentDate, setCurrentDate] = React.useState(new Date(2026, 6, 1));
-  const events: VOCCalendarEvent[] = [];
+  const [currentDate, setCurrentDate] = React.useState(new Date());
+  const [events, setEvents] = React.useState<VOCCalendarEvent[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getCalendarEvents();
+      if (!cancelled) {
+        setEvents(data);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -50,6 +64,30 @@ export default function VOCCalendarPage() {
   const today = new Date();
   const isToday = (day: number) => day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
 
+  const upcomingEvents = events
+    .filter(e => e.date >= today.toISOString().split('T')[0])
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 8);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <CalendarIcon className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Calendar</h1>
+            <p className="text-sm text-muted-foreground">Loading calendar events...</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -63,7 +101,6 @@ export default function VOCCalendarPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Calendar Grid */}
         <Card className="lg:col-span-2 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -71,6 +108,9 @@ export default function VOCCalendarPage() {
               <div className="flex gap-1">
                 <button onClick={() => setCurrentDate(new Date(year, month - 1))} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                   <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button onClick={() => setCurrentDate(new Date())} className="px-2 py-1 text-xs rounded-lg hover:bg-muted transition-colors font-medium">
+                  Today
                 </button>
                 <button onClick={() => setCurrentDate(new Date(year, month + 1))} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                   <ChevronRight className="h-4 w-4" />
@@ -93,7 +133,10 @@ export default function VOCCalendarPage() {
                 >
                   {day !== null && (
                     <>
-                      <span className={cn('text-xs font-medium', isToday(day) && 'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center')}>
+                      <span className={cn(
+                        'text-xs font-medium',
+                        isToday(day) && 'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center',
+                      )}>
                         {day}
                       </span>
                       <div className="mt-1 space-y-0.5">
@@ -111,33 +154,56 @@ export default function VOCCalendarPage() {
           </CardContent>
         </Card>
 
-        {/* Upcoming Events Sidebar */}
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Upcoming</CardTitle>
+            <CardTitle className="text-sm font-semibold">Upcoming Events</CardTitle>
+            <p className="text-xs text-muted-foreground">{upcomingEvents.length} event{upcomingEvents.length !== 1 ? 's' : ''}</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {events.sort((a, b) => a.date.localeCompare(b.date)).map(evt => (
-                <div key={evt.id} className={cn('p-3 rounded-lg border', EVENT_COLORS[evt.type]?.bg)}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={EVENT_COLORS[evt.type]?.text}>{EVENT_ICONS[evt.type]}</span>
-                    <span className={cn('text-xs font-semibold', EVENT_COLORS[evt.type]?.text)}>
-                      {evt.type.charAt(0).toUpperCase() + evt.type.slice(1)}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium">{evt.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{evt.project_name}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                    <CalendarIcon className="h-3 w-3" />
-                    {new Date(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {evt.time}
-                  </p>
+              {upcomingEvents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CalendarIcon className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">No upcoming events</p>
                 </div>
-              ))}
+              ) : (
+                upcomingEvents.map(evt => (
+                  <div key={evt.id} className={cn('p-3 rounded-lg border', EVENT_COLORS[evt.type]?.bg)}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={EVENT_COLORS[evt.type]?.text}>{EVENT_ICONS[evt.type]}</span>
+                      <span className={cn('text-xs font-semibold', EVENT_COLORS[evt.type]?.text)}>
+                        {evt.type.charAt(0).toUpperCase() + evt.type.slice(1)}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium">{evt.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{evt.project_name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3" />
+                      {new Date(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {evt.time}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Event Legend</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            {Object.entries(EVENT_COLORS).map(([type, colors]) => (
+              <div key={type} className="flex items-center gap-2">
+                <div className={cn('h-3 w-3 rounded-full', colors.dot)} />
+                <span className="text-xs text-muted-foreground capitalize">{type}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

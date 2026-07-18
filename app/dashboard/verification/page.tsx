@@ -18,7 +18,6 @@ import {
   FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getApplications, getApplicationsByStatus, getActiveApplicationsForAgency, getAgencyForProfile } from '@/lib/voc-services';
 import { useAuth } from '@/components/providers/auth-provider';
 import {
   APPLICATION_STATUS_LABELS,
@@ -47,14 +46,25 @@ export default function VOCDashboardPage() {
   const router = useRouter();
   const { profile } = useAuth();
 
-  const allApplications = React.useMemo(() => {
-    const all = getApplications();
-    if (!profile) return all;
-    const agency = getAgencyForProfile(profile.id);
-    if (agency) {
-      return all.filter(app => app.verification_agency_id === agency.id);
-    }
-    return all;
+  const [allApplications, setAllApplications] = React.useState<VerificationApplication[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const voc = await import('@/lib/voc-services');
+      const all = await voc.getAllApplicationsForDashboard();
+      if (!cancelled) {
+        if (!profile) {
+          setAllApplications(all);
+        } else {
+          const agency = await voc.getAgencyForProfile(profile.id);
+          if (!cancelled) {
+            setAllApplications(agency ? all.filter(app => app.verification_agency_id === agency.id) : all);
+          }
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [profile]);
 
   const counts = React.useMemo(() => {

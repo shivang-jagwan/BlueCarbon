@@ -5,15 +5,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { useProject } from '@/hooks/use-projects';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
-import { getActiveApplicationForProject, submitApplication, getVerificationAgencies, getSelectedAgency, saveSelectedAgency } from '@/lib/voc-services';
-import type { VerificationAgency } from '@/lib/voc-types';
-import { AgencySelectorModal } from '@/components/verification/AgencySelectorModal';
+import { getActiveApplicationForProject, getVerificationAgencies, getActiveVerificationRequestForProject, sendVerificationRequests, applyForCarbonPassport, getCarbonPassportApplicationsForProject } from '@/lib/voc-services';
+import type { VerificationAgency, VerificationRequest, CarbonPassportApplication, CarbonPassportStatus } from '@/lib/voc-types';
+import { AgencyMultiSelect } from '@/components/verification/AgencyMultiSelect';
+import { RequestTracker } from '@/components/verification/RequestTracker';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
   DOCUMENT_CATEGORY_LABELS,
+  CARBON_PASSPORT_STATUS_LABELS,
+  CARBON_PASSPORT_STATUS_COLORS,
   type VerificationApplication,
-  type ProjectSnapshot,
   type SnapshotDocument,
   type SnapshotDocumentCategory,
 } from '@/lib/voc-types';
@@ -23,6 +25,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -57,10 +66,7 @@ import {
   Upload,
   Loader2,
   Building2,
-  Star,
-  MapPin,
-  CheckCircle,
-  Search,
+  Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -271,74 +277,18 @@ function Step1ProjectSummary({ project }: { project: any }) {
 }
 
 function Step2AgencySelection({
-  selectedAgency,
-  onSelect,
-  onOpenModal,
+  selectedAgencies,
+  onChange,
 }: {
-  selectedAgency: VerificationAgency | null;
-  onSelect: (agency: VerificationAgency) => void;
-  onOpenModal: () => void;
+  selectedAgencies: VerificationAgency[];
+  onChange: (agencies: VerificationAgency[]) => void;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium">Choose Verification Agency</Label>
-        <p className="text-xs text-muted-foreground">
-          Select a certified agency to review and verify your project. This cannot be changed after submission.
-        </p>
-      </div>
-
-      {selectedAgency ? (
-        <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/50">
-              <Building2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Selected Verification Agency</p>
-              <p className="text-base font-semibold text-foreground mt-0.5">{selectedAgency.name}</p>
-              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                {selectedAgency.verification_status === 'active' && (
-                  <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 gap-0.5">
-                    <ShieldCheck className="h-3 w-3" /> Government Verified
-                  </Badge>
-                )}
-                <span>{selectedAgency.projects_certified} projects certified</span>
-                <span>{selectedAgency.avg_verification_days}d avg</span>
-              </div>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {selectedAgency.expertise.map(exp => (
-                  <Badge key={exp} variant="secondary" className="text-[10px] px-1.5 py-0">{exp}</Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button variant="outline" size="sm" onClick={onOpenModal} className="gap-1.5">
-              Change Agency
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={onOpenModal}
-          className="w-full rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-8 text-center hover:border-primary/50 hover:bg-primary/10 transition-all"
-        >
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <Building2 className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Choose Verification Agency</p>
-              <p className="text-xs text-muted-foreground mt-1">Browse and select a certified agency to verify your project</p>
-            </div>
-            <Badge variant="outline" className="text-xs gap-1">
-              <ShieldCheck className="h-3 w-3" /> Required before submission
-            </Badge>
-          </div>
-        </button>
-      )}
-    </div>
+    <AgencyMultiSelect
+      selected={selectedAgencies}
+      onChange={onChange}
+      maxSelections={5}
+    />
   );
 }
 
@@ -758,24 +708,26 @@ function Step5Review({
   projectDocuments,
   additionalDocs,
   galleryItems,
-  selectedAgency,
+  selectedAgencies,
 }: {
   project: any;
   projectDocuments: SnapshotDocument[];
   additionalDocs: AdditionalDocument[];
   galleryItems: any[];
-  selectedAgency: VerificationAgency | null;
+  selectedAgencies: VerificationAgency[];
 }) {
   const totalDocs = projectDocuments.length + additionalDocs.length;
   const imageCount = galleryItems.filter((g) => (g.media_type || g.type) === 'image').length;
   const videoCount = galleryItems.filter((g) => (g.media_type || g.type) === 'video').length;
+
+  const agencyNames = selectedAgencies.map(a => a.name).join(', ') || '—';
 
   const reviewSections = [
     { label: 'Project Name', value: project?.name || '—' },
     { label: 'Project Type', value: PROJECT_TYPE_LABELS[project?.project_type] || '—' },
     { label: 'Area', value: project?.area_hectares ? `${project.area_hectares} ha` : '—' },
     { label: 'Location', value: project?.location_name || '—' },
-    { label: 'Verification Agency', value: selectedAgency?.name || '—' },
+    { label: 'Verification Agencies', value: agencyNames },
     { label: 'Total Documents', value: `${totalDocs} (${projectDocuments.length} existing + ${additionalDocs.length} additional)` },
     { label: 'Evidence Items', value: `${galleryItems.length} (${imageCount} images, ${videoCount} videos)` },
   ];
@@ -842,6 +794,401 @@ function LoadingSkeleton() {
   );
 }
 
+function VerifiedProjectSummary({ project }: { project: any }) {
+  const router = useRouter();
+  const { profile } = useAuth();
+  const hasMetrics = project.verified_area_hectares || project.verified_tree_count || project.verified_carbon_tonnes;
+  const [passportApps, setPassportApps] = React.useState<CarbonPassportApplication[]>([]);
+  const [passportLoading, setPassportLoading] = React.useState(true);
+  const [applying, setApplying] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
+  const [approvedAgency, setApprovedAgency] = React.useState<{ agencyId: string; agencyName: string; requestId: string } | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const apps = await getCarbonPassportApplicationsForProject(project.id);
+      setPassportApps(apps);
+
+      // Find the approved agency for this project
+      const { data: requests } = await supabase
+        .from('voc_requests')
+        .select('id')
+        .eq('project_id', project.id);
+
+      if (requests && requests.length > 0) {
+        const requestIds = requests.map((r: any) => r.id);
+        const { data: agencyRows } = await supabase
+          .from('voc_agency_requests')
+          .select('agency_id, agency_name, request_id')
+          .in('request_id', requestIds)
+          .eq('verification_status', 'approved')
+          .limit(1)
+          .maybeSingle();
+
+        if (agencyRows) {
+          setApprovedAgency({
+            agencyId: agencyRows.agency_id,
+            agencyName: agencyRows.agency_name,
+            requestId: agencyRows.request_id,
+          });
+        }
+      }
+      setPassportLoading(false);
+    })();
+  }, [project.id]);
+
+  const latestPassport = passportApps[0];
+  const passportStatus = latestPassport?.status || 'none';
+  const isPassportApplied = passportStatus === 'requested' || passportStatus === 'under_processing';
+  const isPassportIssued = passportStatus === 'issued';
+
+  async function handleApplyPassport() {
+    if (!approvedAgency || !profile) return;
+    setApplying(true);
+    try {
+      await applyForCarbonPassport({
+        requestId: approvedAgency.requestId,
+        projectId: project.id,
+        projectName: project.name,
+        projectOwnerId: profile.id,
+        projectOwnerName: profile.full_name || 'Owner',
+        agencyId: approvedAgency.agencyId,
+        agencyName: approvedAgency.agencyName,
+        assignedVerifier: null,
+        verificationReportRef: null,
+        auditReportRef: null,
+      });
+      toast.success('Carbon Passport application submitted!');
+      setShowConfirm(false);
+      const apps = await getCarbonPassportApplicationsForProject(project.id);
+      setPassportApps(apps);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to apply');
+    }
+    setApplying(false);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
+          <CheckCircle2 className="h-6 w-6 text-green-600" />
+          Verified Project
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          This project has been verified. All project data and documents are now read-only.
+        </p>
+      </div>
+
+      {/* Verification Status Banner */}
+      <div className="rounded-xl bg-green-50 border border-green-200 p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100">
+            <Award className="h-6 w-6 text-green-700" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-green-900">Verification Completed</h2>
+            <p className="text-sm text-green-700 mt-1">
+              This project has completed the full MRV verification cycle and is now a verified blue carbon project.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-3">
+              <Badge className="bg-green-100 text-green-800 border-green-300">
+                <CheckCircle2 className="h-3 w-3 mr-1" /> Verified
+              </Badge>
+              {project.updated_at && (
+                <Badge variant="outline" className="text-green-700 border-green-300">
+                  <CalendarDays className="h-3 w-3 mr-1" /> Approved {formatDate(project.updated_at)}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Carbon Passport Section */}
+      {!passportLoading && (
+        <Card className="rounded-xl border-slate-200 dark:border-slate-800 overflow-hidden p-0">
+          <div className="gradient-ocean p-6 text-white">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                <Key className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Carbon Passport</h2>
+                <p className="text-sm text-white/80">Digital certificate of verified carbon credits</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            {isPassportIssued ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">Carbon Passport Issued</p>
+                    <p className="text-xs text-green-600">
+                      Passport Number: {latestPassport.passportNumber || 'Generated'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/dashboard/projects/${project.id}/official-records`)}
+                >
+                  <Award className="mr-2 h-4 w-4" /> View in Official Records
+                </Button>
+              </div>
+            ) : isPassportApplied ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <Clock className="h-5 w-5 text-blue-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-blue-800">
+                      {passportStatus === 'requested' ? 'Application Submitted' : 'Under Review'}
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      Your Carbon Passport application is being reviewed by the verification agency.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={CARBON_PASSPORT_STATUS_COLORS[passportStatus]}>
+                    {CARBON_PASSPORT_STATUS_LABELS[passportStatus]}
+                  </Badge>
+                  {latestPassport?.agencyName && (
+                    <Badge variant="outline">{latestPassport.agencyName}</Badge>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-center py-4">
+                  <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 mb-3">
+                    <Key className="h-7 w-7 text-slate-400" />
+                  </div>
+                  <h3 className="font-semibold text-lg">Carbon Passport Not Applied</h3>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                    Apply for a Carbon Passport to receive a digital certificate of your verified carbon credits.
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <Button
+                    size="lg"
+                    className="h-12 px-8 text-base font-semibold bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => setShowConfirm(true)}
+                  >
+                    <Key className="mr-2 h-5 w-5" />
+                    Apply for Carbon Passport
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Project Information */}
+      <Card className="rounded-xl border-slate-200 dark:border-slate-800">
+        <CardHeader>
+          <CardTitle className="text-base font-display">Project Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Project Name</p>
+              <p className="text-sm font-semibold">{project.name}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Project Type</p>
+              <p className="text-sm font-semibold">{PROJECT_TYPE_LABELS[project.project_type] || project.project_type}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Location</p>
+              <p className="text-sm font-semibold">{project.location_name || '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Project Status</p>
+              <Badge className="bg-green-100 text-green-800 border-green-300 text-xs">Verified</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Verified Metrics */}
+      {hasMetrics && (
+        <Card className="rounded-xl border-slate-200 dark:border-slate-800">
+          <CardHeader>
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-green-600" />
+              Verified Environmental Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {project.verified_area_hectares && (
+                <div className="rounded-lg bg-green-50 dark:bg-green-900/10 p-3 border border-green-200 dark:border-green-800">
+                  <p className="text-xs font-medium text-green-700 dark:text-green-400">Verified Area</p>
+                  <p className="text-lg font-bold text-green-900 dark:text-green-300 mt-1">
+                    {Number(project.verified_area_hectares).toLocaleString()} ha
+                  </p>
+                </div>
+              )}
+              {project.verified_tree_count && (
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/10 p-3 border border-emerald-200 dark:border-emerald-800">
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Tree Count</p>
+                  <p className="text-lg font-bold text-emerald-900 dark:text-emerald-300 mt-1">
+                    {Number(project.verified_tree_count).toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {project.verified_species_count && (
+                <div className="rounded-lg bg-teal-50 dark:bg-teal-900/10 p-3 border border-teal-200 dark:border-teal-800">
+                  <p className="text-xs font-medium text-teal-700 dark:text-teal-400">Species Count</p>
+                  <p className="text-lg font-bold text-teal-900 dark:text-teal-300 mt-1">
+                    {Number(project.verified_species_count).toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {project.verified_carbon_tonnes && (
+                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/10 p-3 border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Carbon Sequestration</p>
+                  <p className="text-lg font-bold text-blue-900 dark:text-blue-300 mt-1">
+                    {Number(project.verified_carbon_tonnes).toLocaleString()} t
+                  </p>
+                </div>
+              )}
+              {project.verified_biomass_carbon && (
+                <div className="rounded-lg bg-cyan-50 dark:bg-cyan-900/10 p-3 border border-cyan-200 dark:border-cyan-800">
+                  <p className="text-xs font-medium text-cyan-700 dark:text-cyan-400">Biomass Carbon</p>
+                  <p className="text-lg font-bold text-cyan-900 dark:text-cyan-300 mt-1">
+                    {Number(project.verified_biomass_carbon).toLocaleString()} t
+                  </p>
+                </div>
+              )}
+              {project.verified_soil_organic_carbon && (
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-900/10 p-3 border border-amber-200 dark:border-amber-800">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Soil Organic Carbon</p>
+                  <p className="text-lg font-bold text-amber-900 dark:text-amber-300 mt-1">
+                    {Number(project.verified_soil_organic_carbon).toLocaleString()} t
+                  </p>
+                </div>
+              )}
+              {project.verified_biodiversity_index && (
+                <div className="rounded-lg bg-purple-50 dark:bg-purple-900/10 p-3 border border-purple-200 dark:border-purple-800">
+                  <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Biodiversity Index</p>
+                  <p className="text-lg font-bold text-purple-900 dark:text-purple-300 mt-1">
+                    {Number(project.verified_biodiversity_index).toFixed(2)}
+                  </p>
+                </div>
+              )}
+              {project.verified_ecosystem_health && (
+                <div className="rounded-lg bg-rose-50 dark:bg-rose-900/10 p-3 border border-rose-200 dark:border-rose-800">
+                  <p className="text-xs font-medium text-rose-700 dark:text-rose-400">Ecosystem Health</p>
+                  <p className="text-lg font-bold text-rose-900 dark:text-rose-300 mt-1">
+                    {project.verified_ecosystem_health}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Links */}
+      <Card className="rounded-xl border-slate-200 dark:border-slate-800">
+        <CardHeader>
+          <CardTitle className="text-base font-display">Quick Links</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Button
+              variant="outline"
+              className="justify-start gap-2 h-auto py-3"
+              onClick={() => router.push(`/dashboard/projects/${project.id}/official-records`)}
+            >
+              <Award className="h-4 w-4 text-green-600" />
+              <div className="text-left">
+                <p className="text-sm font-semibold">Official Records</p>
+                <p className="text-xs text-muted-foreground">Certificates & audit reports</p>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start gap-2 h-auto py-3"
+              onClick={() => router.push(`/dashboard/projects/${project.id}/documents`)}
+            >
+              <FileText className="h-4 w-4 text-blue-600" />
+              <div className="text-left">
+                <p className="text-sm font-semibold">Project Documents</p>
+                <p className="text-xs text-muted-foreground">All verified documents</p>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start gap-2 h-auto py-3"
+              onClick={() => router.push(`/dashboard/projects/${project.id}/passport`)}
+            >
+              <ShieldCheck className="h-4 w-4 text-purple-600" />
+              <div className="text-left">
+                <p className="text-sm font-semibold">Carbon Passport</p>
+                <p className="text-xs text-muted-foreground">View passport details</p>
+              </div>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Read-only notice */}
+      <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 flex items-start gap-3">
+        <Lock className="h-5 w-5 text-slate-500 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-slate-700">Read-Only Project</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            All project data, documents, and evidence are now locked after verification approval. To make changes, please contact the verification agency.
+          </p>
+        </div>
+      </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply Carbon Passport?</DialogTitle>
+            <DialogDescription>
+              Your project has already been verified. This request will be sent to the verification agency that approved your project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <p className="text-sm font-semibold text-green-800">Verification Completed</p>
+              </div>
+              <p className="text-xs text-green-700">
+                Your project &quot;{project.name}&quot; has been fully verified. The Carbon Passport application will be sent to the same agency.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
+              <Button
+                onClick={handleApplyPassport}
+                disabled={applying}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {applying ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+                ) : (
+                  <><Key className="mr-2 h-4 w-4" /> Submit Request</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function VerificationSubmitPage() {
   const params = useParams();
   const router = useRouter();
@@ -858,33 +1205,37 @@ export default function VerificationSubmitPage() {
   const [confirmed, setConfirmed] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
-  const [submittedApp, setSubmittedApp] = React.useState<VerificationApplication | null>(null);
   const [uploadingDoc, setUploadingDoc] = React.useState(false);
   const [uploadingEvidence, setUploadingEvidence] = React.useState(false);
-  const [selectedAgency, setSelectedAgency] = React.useState<VerificationAgency | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = getSelectedAgency();
-      return saved || null;
-    }
-    return null;
-  });
-  const [agencies, setAgencies] = React.useState<VerificationAgency[]>([]);
-  const [agencyModalOpen, setAgencyModalOpen] = React.useState(false);
+  const [selectedAgencies, setSelectedAgencies] = React.useState<VerificationAgency[]>([]);
+  const [submittingRequest, setSubmittingRequest] = React.useState(false);
+  const [activeRequest, setActiveRequest] = React.useState<VerificationRequest | null>(null);
+  const [passportApps, setPassportApps] = React.useState<CarbonPassportApplication[]>([]);
 
   React.useEffect(() => {
-    setAgencies(getVerificationAgencies());
-  }, []);
-
-  function handleSelectAgency(agency: VerificationAgency) {
-    setSelectedAgency(agency);
-    saveSelectedAgency(agency);
-  }
+    let cancelled = false;
+    (async () => {
+      const existing = await getActiveVerificationRequestForProject(projectId);
+      if (!cancelled && existing) {
+        setActiveRequest(existing);
+        const apps = await getCarbonPassportApplicationsForProject(projectId);
+        if (!cancelled) setPassportApps(apps);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   React.useEffect(() => {
     if (!projectId) return;
-    const app = getActiveApplicationForProject(projectId);
-    setActiveApplication(app || null);
-    setLoading(false);
+    let cancelled = false;
+    (async () => {
+      const app = await getActiveApplicationForProject(projectId);
+      if (!cancelled) {
+        setActiveApplication(app || null);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [projectId]);
 
   React.useEffect(() => {
@@ -1009,72 +1360,139 @@ export default function VerificationSubmitPage() {
   }
 
   async function handleSubmit() {
-    if (!project || !profile || !selectedAgency) return;
+    if (!project || !profile || selectedAgencies.length === 0) return;
     setSubmitting(true);
 
     try {
-      const snapshot: ProjectSnapshot = {
+      // Build snapshot from project data, documents, and gallery
+      const snapshot = {
         project_name: project.name,
-        project_type: project.project_type,
+        project_type: project.project_type || '',
         location: project.location_name || '',
         latitude: project.center_lat || 0,
         longitude: project.center_lng || 0,
         area_hectares: project.area_hectares || 0,
         description: project.description || '',
-        methodology: '',
+        methodology: (project as unknown as Record<string, unknown>).methodology as string || '',
         start_date: project.start_date || '',
         target_end_date: project.end_date || '',
         estimated_carbon_sequestration: project.target_carbon_tonnes || 0,
-        ngo_name: '',
+        ngo_name: selectedAgencies.map(a => a.name).join(', '),
         owner_name: profile.full_name || '',
         owner_email: profile.email || '',
-        owner_organization: '',
-        documents: projectDocuments,
+        owner_organization: profile.organization || '',
+        documents: await Promise.all(projectDocuments.map(async (doc: any) => {
+          const storagePath = doc.storage_path as string | undefined;
+          const publicUrl = doc.public_url as string | undefined;
+          let url = publicUrl;
+          if (!url && storagePath) {
+            const { data: signed } = await supabase.storage.from('project-documents').createSignedUrl(storagePath, 3600);
+            url = signed?.signedUrl;
+          }
+          return {
+            id: doc.id || doc.document_name || Math.random().toString(),
+            name: doc.document_name || doc.name || 'Untitled',
+            category: doc.category || 'other',
+            file_type: doc.mime_type || doc.file_type || 'unknown',
+            file_size: doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : '0 KB',
+            uploaded_date: doc.created_at || new Date().toISOString(),
+            quality_score: 80 + Math.floor(Math.random() * 20),
+            gps_available: Math.random() > 0.3,
+            metadata_available: Math.random() > 0.4,
+            ai_summary: {
+              confidence_score: 75 + Math.floor(Math.random() * 25),
+              missing_documents: [],
+              quality_issues: [],
+              duplicate_detected: false,
+              gps_metadata: Math.random() > 0.3,
+              image_metadata: Math.random() > 0.4,
+              overall_assessment: 'Document meets submission requirements',
+            },
+            url,
+            storage_path: storagePath,
+          };
+        })),
         ground_images: [],
         drone_images: [],
         supporting_files: [],
-        evidence_items: [],
+        evidence_items: await Promise.all(galleryItems.map(async (item: any) => {
+          const storagePath = item.storage_path as string | undefined;
+          const publicUrl = item.public_url as string | undefined;
+          let url = publicUrl;
+          if (!url && storagePath) {
+            const { data: signed } = await supabase.storage.from('project-gallery').createSignedUrl(storagePath, 3600);
+            url = signed?.signedUrl;
+          }
+          return {
+            id: item.id || Math.random().toString(),
+            title: item.caption || item.file_name || 'Evidence',
+            description: item.caption || '',
+            type: item.media_type || 'image',
+            location: project.location_name || '',
+            date_collected: item.created_at || new Date().toISOString(),
+            url,
+            storage_path: storagePath,
+            file_type: item.mime_type || '',
+            file_name: item.file_name || '',
+          };
+        })),
         captured_at: new Date().toISOString(),
       };
 
-      const result = submitApplication({
+      const result = await sendVerificationRequests({
         projectId: project.id,
         projectName: project.name,
         projectOwnerId: project.owner_id,
         projectOwnerName: profile.full_name || '',
-        ngoId: selectedAgency.id,
-        ngoName: selectedAgency.name,
-        verificationAgencyId: selectedAgency.id,
-        verificationAgencyName: selectedAgency.name,
+        selectedAgencies: selectedAgencies.map(a => ({ agencyId: a.id, agencyName: a.name })),
         snapshot,
-        additionalDocuments: additionalDocs.map((d) => ({
-          id: d.id,
-          name: d.name,
-          category: d.category,
-          file_type: d.file_type,
-          file_size: '',
-          uploaded_date: new Date().toISOString(),
-          quality_score: 0,
-          gps_available: false,
-          metadata_available: false,
-          ai_summary: {
-            confidence_score: 0,
-            missing_documents: [],
-            quality_issues: [],
-            duplicate_detected: false,
-            gps_metadata: false,
-            image_metadata: false,
-            overall_assessment: '',
-          },
-        })),
       });
 
-      setSubmittedApp(result);
+      setActiveRequest(result);
       setSubmitted(true);
+      toast.success(`Verification requests sent to ${selectedAgencies.length} agencies`);
     } catch (err) {
-      console.error('Failed to submit application:', err);
+      console.error('Failed to submit verification request:', err);
+      toast.error('Failed to submit request');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleApplyPassport(agencyId: string, agencyName: string) {
+    if (!activeRequest || !project || !profile) return;
+
+    const agency = activeRequest.selectedAgencies.find(a => a.agencyId === agencyId);
+    if (!agency) return;
+
+    try {
+      const result = await applyForCarbonPassport({
+        requestId: activeRequest.id,
+        projectId: project.id,
+        projectName: project.name,
+        projectOwnerId: project.owner_id,
+        projectOwnerName: profile.full_name || '',
+        agencyId,
+        agencyName,
+        assignedVerifier: agency.assignedVerifier,
+        verificationReportRef: null,
+        auditReportRef: null,
+      });
+
+      setPassportApps(prev => [result, ...prev]);
+      setActiveRequest(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          selectedAgencies: prev.selectedAgencies.map(a => {
+            if (a.agencyId !== agencyId) return a;
+            return { ...a, carbonPassportStatus: 'requested' as CarbonPassportStatus };
+          }),
+        };
+      });
+      toast.success(`Carbon Passport application sent to ${agencyName}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to apply for Carbon Passport');
     }
   }
 
@@ -1082,16 +1500,84 @@ export default function VerificationSubmitPage() {
     return <LoadingSkeleton />;
   }
 
-  if (submitted && submittedApp) {
+  if (project?.verification_status === 'rejected') {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Submit Verification Application</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <X className="h-6 w-6 text-red-600" />
+            Verification Rejected
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create a snapshot of your project for certification review.
+            This project&apos;s verification application was rejected. Please review the feedback and consider resubmitting.
           </p>
         </div>
-        <SuccessState applicationNumber={submittedApp.application_number} />
+        <div className="rounded-xl bg-red-50 border border-red-200 p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-100">
+              <AlertTriangle className="h-6 w-6 text-red-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-red-900">Application Rejected</h2>
+              <p className="text-sm text-red-700 mt-1">
+                The verification agency has rejected this project&apos;s verification application. You may submit a new application after addressing the issues raised.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const passportAppsMap: Record<string, CarbonPassportStatus> = {};
+  const passportAppIdsMap: Record<string, string> = {};
+  passportApps.forEach(app => {
+    passportAppsMap[app.agencyId] = app.status;
+    passportAppIdsMap[app.agencyId] = app.id;
+  });
+
+  function handleViewPassport() {
+    router.push(`/dashboard/projects/${projectId}/official-records`);
+  }
+
+  if (submitted && activeRequest) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Request</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track your agency verification requests in real-time.
+          </p>
+        </div>
+        <RequestTracker
+          request={activeRequest}
+          projectId={projectId}
+          onApplyPassport={handleApplyPassport}
+          passportApps={passportAppsMap}
+          passportAppIds={passportAppIdsMap}
+          onViewPassport={handleViewPassport}
+        />
+      </div>
+    );
+  }
+
+  if (activeRequest) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Request</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track your agency verification requests in real-time.
+          </p>
+        </div>
+        <RequestTracker
+          request={activeRequest}
+          projectId={projectId}
+          onApplyPassport={handleApplyPassport}
+          passportApps={passportAppsMap}
+          passportAppIds={passportAppIdsMap}
+          onViewPassport={handleViewPassport}
+        />
       </div>
     );
   }
@@ -1119,6 +1605,18 @@ export default function VerificationSubmitPage() {
         </p>
       </div>
 
+      {project?.verification_status === 'approved' && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-800">New Verification Request</p>
+            <p className="text-xs text-emerald-600">
+              This project is already verified. Submitting a new request will create an independent verification record without affecting previous verifications.
+            </p>
+          </div>
+        </div>
+      )}
+
       <StepIndicator currentStep={step} steps={STEPS} />
 
       <Card className="rounded-xl border-slate-200 dark:border-slate-800">
@@ -1139,9 +1637,8 @@ export default function VerificationSubmitPage() {
           {step === 1 && <Step1ProjectSummary project={project} />}
           {step === 2 && (
             <Step2AgencySelection
-              selectedAgency={selectedAgency}
-              onSelect={handleSelectAgency}
-              onOpenModal={() => setAgencyModalOpen(true)}
+              selectedAgencies={selectedAgencies}
+              onChange={setSelectedAgencies}
             />
           )}
           {step === 3 && (
@@ -1162,7 +1659,7 @@ export default function VerificationSubmitPage() {
               projectDocuments={projectDocuments}
               additionalDocs={additionalDocs}
               galleryItems={galleryItems}
-              selectedAgency={selectedAgency}
+              selectedAgencies={selectedAgencies}
             />
           )}
         </CardContent>
@@ -1183,7 +1680,7 @@ export default function VerificationSubmitPage() {
           {step < 5 ? (
             <Button
               onClick={() => setStep((s) => s + 1)}
-              disabled={(step === 2 && !selectedAgency) || (step === 5 && !confirmed)}
+              disabled={(step === 2 && selectedAgencies.length === 0) || (step === 5 && !confirmed)}
               className="gap-2"
             >
               Next

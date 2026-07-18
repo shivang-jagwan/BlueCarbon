@@ -10,11 +10,11 @@ import {
 } from '@/lib/types';
 import { WorkspaceSidebar } from '@/components/workspace/WorkspaceSidebar';
 import { WorkspaceHeader } from '@/components/workspace/WorkspaceHeader';
-import { getWorkspaceNavForRole } from '@/lib/workspace-navigation';
+import { getWorkspaceNavForRole, getOwnerWorkspaceNav } from '@/lib/workspace-navigation';
 import { getApplicationsForProject } from '@/lib/voc-services';
-import { APPLICATION_STATUS_LABELS, APPLICATION_STATUS_COLORS } from '@/lib/voc-types';
+import { APPLICATION_STATUS_LABELS, APPLICATION_STATUS_COLORS, type ApplicationStatus } from '@/lib/voc-types';
 import { Badge } from '@/components/ui/badge';
-import { Lock, AlertTriangle } from 'lucide-react';
+import { Lock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ProjectWorkspaceLayout({
@@ -28,13 +28,21 @@ export default function ProjectWorkspaceLayout({
   const { project, loading } = useProject(projectId);
   const { profile } = useAuth();
   const role = profile?.role;
-  const sections = getWorkspaceNavForRole(role ?? null);
+  const sections = getWorkspaceNavForRole(role ?? null, project?.verification_status);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  const activeApplication = React.useMemo(() => {
-    if (role !== 'project_owner') return null;
-    const apps = getApplicationsForProject(projectId);
-    return apps.find(a => ['submitted', 'under_review', 'audit_scheduled', 'audit_completed'].includes(a.status));
+  const [activeApplication, setActiveApplication] = React.useState<{ id: string; application_number: string; status: ApplicationStatus } | null>(null);
+
+  React.useEffect(() => {
+    if (role !== 'project_owner') return;
+    let cancelled = false;
+    (async () => {
+      const apps = await getApplicationsForProject(projectId);
+      if (!cancelled) {
+        setActiveApplication(apps.find(a => (['submitted', 'under_review', 'audit_scheduled', 'audit_completed'] as ApplicationStatus[]).includes(a.status as ApplicationStatus)) || null);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [projectId, role]);
 
   React.useEffect(() => {
@@ -76,6 +84,22 @@ export default function ProjectWorkspaceLayout({
                 </div>
                 <p className="text-xs text-amber-600 mt-0.5">
                   Project records are locked until the certification process is completed. Application: {activeApplication.application_number}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {project?.verification_status === 'approved' && !activeApplication && (
+          <div className="mx-4 md:mx-6 lg:mx-8 mt-4">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-100">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-green-800">Project Verified</p>
+                <p className="text-xs text-green-600 mt-0.5">
+                  This project has been verified. All project data, documents, and evidence are read-only.
                 </p>
               </div>
             </div>

@@ -38,14 +38,24 @@ export default function VerificationApplicationsPage() {
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');
 
-  const allApplications = React.useMemo(() => {
-    const all = getApplications();
-    if (!profile) return all;
-    const agency = getAgencyForProfile(profile.id);
-    if (agency) {
-      return all.filter(app => app.verification_agency_id === agency.id);
-    }
-    return all;
+  const [allApplications, setAllApplications] = React.useState<import('@/lib/voc-types').VerificationApplication[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const all = await getApplications();
+      if (!cancelled) {
+        if (!profile) {
+          setAllApplications(all);
+        } else {
+          const agency = await getAgencyForProfile(profile.id);
+          if (!cancelled) {
+            setAllApplications(agency ? all.filter(app => app.verification_agency_id === agency.id) : all);
+          }
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [profile]);
 
   const filtered = React.useMemo(() => {
@@ -111,7 +121,7 @@ export default function VerificationApplicationsPage() {
                     <span>NGO: {app.ngo_name}</span>
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(app.submitted_date).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{app.snapshot.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{app.snapshot?.description}</p>
                 </div>
                 <Button variant="ghost" size="sm" className="shrink-0">
                   Open Application <ArrowRight className="h-3.5 w-3.5 ml-1" />

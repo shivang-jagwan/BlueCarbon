@@ -16,7 +16,7 @@ import { getRoleLabel } from '@/lib/navigation';
 const QUICK_ACTIONS = [
   { label: 'Register New Project', href: '/dashboard/projects/new', icon: Plus, color: 'text-primary' },
   { label: 'Discover Projects', href: '/dashboard/discover', icon: Search, color: 'text-accent' },
-  { label: 'Find Verifier', href: '/dashboard/verifiers', icon: Building2, color: 'text-warning' },
+  { label: 'Browse Agencies', href: '/dashboard/verification-agencies', icon: Building2, color: 'text-warning' },
   { label: 'View Reports', href: '/dashboard/reports', icon: FileText, color: 'text-success' },
 ];
 
