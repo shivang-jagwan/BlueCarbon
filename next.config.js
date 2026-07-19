@@ -29,7 +29,6 @@ const nextConfig = {
               "connect-src 'self' https://*.supabase.co https://api.maptiler.com https://nominatim.openstreetmap.org wss://*.supabase.co",
               "frame-ancestors 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
             ].join('; '),
           },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },

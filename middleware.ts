@@ -1,7 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Routes that need login
 const PROTECTED = [
   '/dashboard',
   '/workspace',
@@ -18,7 +17,6 @@ const PROTECTED = [
   '/admin',
 ];
 
-// Routes always public — skip middleware entirely
 const PUBLIC = [
   '/login',
   '/register',
@@ -32,24 +30,23 @@ const PUBLIC = [
   '/api/public',
 ];
 
+function getLoginRedirect(pathname: string, baseUrl: string) {
+  if (pathname.startsWith('/sustainability')) return new URL('/sustainability/login', baseUrl);
+  if (pathname.startsWith('/verifier') || pathname.startsWith('/projects') || pathname.startsWith('/verification-center'))
+    return new URL('/verifier/login', baseUrl);
+  return new URL('/login', baseUrl);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip public routes immediately — zero overhead
-  if (PUBLIC.some(p => pathname.startsWith(p))) {
-    return NextResponse.next();
-  }
+  if (PUBLIC.some(p => pathname.startsWith(p))) return NextResponse.next();
 
-  // Only process protected routes
   const isProtected = PROTECTED.some(p => pathname.startsWith(p));
   if (!isProtected) return NextResponse.next();
 
-  // Create response to pass cookies through
-  let response = NextResponse.next({
-    request: { headers: request.headers },
-  });
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
-  // Create SSR Supabase client — reads from cookies, no DB call
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -59,38 +56,45 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request: { headers: request.headers } });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
       },
     }
   );
 
-  // getUser() validates JWT from cookie — NO database round trip
-  const { data: { user } } = await supabase.auth.getUser();
+  let user: { user_metadata?: Record<string, unknown> } | null = null;
 
-  if (!user) {
-    // Redirect to correct login panel based on path
-    if (pathname.startsWith('/sustainability')) {
-      return NextResponse.redirect(new URL('/sustainability/login', request.url));
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      // getUser() failed (token expired, network error, etc.) — fall back to session cookie check
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        user = session.user as { user_metadata?: Record<string, unknown> };
+      }
+    } else {
+      user = data.user;
     }
-    if (pathname.startsWith('/verifier') || pathname.startsWith('/projects') || pathname.startsWith('/verification-center')) {
-      return NextResponse.redirect(new URL('/verifier/login', request.url));
+  } catch {
+    // getUser() threw (network failure, timeout) — fall back to session cookie check
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        user = session.user as { user_metadata?: Record<string, unknown> };
+      }
+    } catch {
+      // getSession() also failed — treat as unauthenticated
     }
-    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Role from JWT metadata — still no DB call
+  if (!user) {
+    return NextResponse.redirect(getLoginRedirect(pathname, request.url));
+  }
+
   const role = user.user_metadata?.role as string | undefined;
 
-  // Block wrong panel access (only if role is known — unknown roles fall through to layout DB check)
   if (pathname.startsWith('/admin') && role && role !== 'admin') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
@@ -109,7 +113,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip static files, images, fonts — only process page routes
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2)$).*)',
   ],
 };

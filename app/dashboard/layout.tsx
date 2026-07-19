@@ -6,10 +6,24 @@ import { DashboardShell } from '@/components/shared/dashboard-shell';
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   const supabase = await getSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  let user: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
+
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      user = session?.user ?? null;
+    } else {
+      user = data.user;
+    }
+  } catch {
+    const { data: { session } } = await supabase.auth.getSession();
+    user = session?.user ?? null;
+  }
 
   if (!user) {
     redirect('/login');
@@ -19,7 +33,7 @@ export default async function DashboardLayout({
     .from('profiles')
     .select('role, approval_status')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   const autoApproved = profile?.role === 'project_owner' || profile?.role === 'sustainability_partner';
   const isApproved = profile?.approval_status === 'approved';
