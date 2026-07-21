@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Download, FileText, Activity, Trees, ArrowRightLeft, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function MonitoringHistory({ reports, assignment }: { reports: any[]; assignment: any }) {
+export function MonitoringHistory({ reports, assignment, onViewReport }: { reports: any[]; assignment: any; onViewReport?: () => void }) {
   if (!reports || reports.length === 0) {
     return (
       <div className="text-center py-24 text-muted-foreground">
@@ -90,7 +90,7 @@ export function MonitoringHistory({ reports, assignment }: { reports: any[]; ass
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="default" size="sm" className="h-8">
+                    <Button variant="default" size="sm" className="h-8" onClick={onViewReport}>
                       <FileText className="h-3.5 w-3.5 mr-2" /> View Report
                     </Button>
                     <Button variant="outline" size="sm" className="h-8">

@@ -134,7 +134,7 @@ export default function MonitoringPortalPage() {
         <div className="max-w-6xl mx-auto space-y-6 pb-20">
           {activeTab === 'overview' && <OverviewTab assignment={assignment} reportCount={reports.length} />}
           {activeTab === 'monthly_monitoring' && <MonitoringWizard assignment={assignment} onComplete={loadData} />}
-          {activeTab === 'history' && <MonitoringHistory reports={reports} assignment={assignment} />}
+          {activeTab === 'history' && <MonitoringHistory reports={reports} assignment={assignment} onViewReport={() => setActiveTab('reports')} />}
           {activeTab === 'media' && <MediaTab projectId={assignment.project_id} />}
           {activeTab === 'timeline' && <TimelineTab projectId={assignment.project_id} />}
           {activeTab === 'reports' && <ReportsTab assignment={assignment} reports={reports} onReload={loadData} />}

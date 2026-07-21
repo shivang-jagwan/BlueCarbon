@@ -91,10 +91,44 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const [previewTab, setPreviewTab] = React.useState('owner');
+  const [stats, setStats] = React.useState({
+    projects: 128,
+    carbon: 45000,
+    hectares: 12000,
+    verifiers: 56
+  });
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
+    
+    // Fetch real stats
+    import('@/lib/supabase/client').then(({ supabase }) => {
+      Promise.all([
+        supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'published'),
+        supabase.from('projects').select('area_hectares'),
+        supabase.from('carbon_passports').select('amount_issued'),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'verifier')
+      ]).then(([projCount, projData, passportData, verifierCount]) => {
+        let totalHectares = 0;
+        if (projData.data) {
+          totalHectares = projData.data.reduce((acc: number, p: any) => acc + (p.area_hectares || 0), 0);
+        }
+        
+        let totalCarbon = 0;
+        if (passportData.data) {
+          totalCarbon = passportData.data.reduce((acc: number, p: any) => acc + (p.amount_issued || 0), 0);
+        }
+
+        setStats({
+          projects: projCount.count || 0,
+          hectares: Math.round(totalHectares) || 0,
+          carbon: Math.round(totalCarbon) || 0,
+          verifiers: verifierCount.count || 0
+        });
+      }).catch(console.error);
+    });
+
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
@@ -310,10 +344,10 @@ export default function LandingPage() {
                 >
                   <div className="grid grid-cols-2 gap-4">
                     {[
-                      { value: '128+', label: 'Active Projects', color: 'text-emerald-400' },
-                      { value: '45K+', label: 'CO₂ Verified (t)', color: 'text-emerald-300' },
-                      { value: '12K+', label: 'Hectares Restored', color: 'text-emerald-400' },
-                      { value: '56+', label: 'Verification Orgs', color: 'text-emerald-300' },
+                      { value: `${stats.projects}`, label: 'Active Projects', color: 'text-emerald-400' },
+                      { value: `${stats.carbon > 1000 ? (stats.carbon / 1000).toFixed(1) + 'K' : stats.carbon}`, label: 'CO₂ Verified (t)', color: 'text-emerald-300' },
+                      { value: `${stats.hectares > 1000 ? (stats.hectares / 1000).toFixed(1) + 'K' : stats.hectares}`, label: 'Hectares Restored', color: 'text-emerald-400' },
+                      { value: `${stats.verifiers}`, label: 'Verification Orgs', color: 'text-emerald-300' },
                     ].map((stat) => (
                       <div key={stat.label} className="text-center">
                         <p className={`text-xl font-bold font-display ${stat.color}`}>{stat.value}</p>
@@ -691,10 +725,10 @@ export default function LandingPage() {
             <motion.div {...fadeUp}>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                 {[
-                  { value: 128, suffix: '+', label: 'Active Projects', icon: TreePine },
-                  { value: 45000, suffix: '+', label: 'Tonnes CO₂ Verified', icon: Leaf },
-                  { value: 12000, suffix: '+', label: 'Hectares Monitored', icon: Globe },
-                  { value: 56, suffix: '+', label: 'Countries', icon: Users },
+                  { value: stats.projects, suffix: '+', label: 'Active Projects', icon: TreePine },
+                  { value: stats.carbon, suffix: '+', label: 'Tonnes CO₂ Verified', icon: Leaf },
+                  { value: stats.hectares, suffix: '+', label: 'Hectares Monitored', icon: Globe },
+                  { value: stats.verifiers, suffix: '+', label: 'Verification Orgs', icon: Building2 },
                 ].map((stat) => (
                   <div key={stat.label} className="flex flex-col items-center">
                     <stat.icon className="h-5 w-5 text-primary/40 mb-3" />

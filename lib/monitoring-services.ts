@@ -179,26 +179,40 @@ export async function getPreviousMonitoringReport(projectId: string, beforeDate:
     .eq('project_id', projectId)
     .lt('report_date', new Date(beforeDate).toISOString().split('T')[0])
     .order('report_date', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     console.error('Error fetching previous monitoring report:', error);
     return null;
   }
-  return data || null;
+  return data && data.length > 0 ? data[0] : null;
 }
 
-export async function submitMonitoringReport(reportData: Omit<MonitoringReport, 'id' | 'created_at' | 'updated_at'>, verifierName: string) {
+export async function submitMonitoringReport(reportData: any, verifierName: string) {
+  const dbData = { ...reportData };
+  
+  // Map UI fields to database schema
+  if (dbData.new_trees !== undefined) {
+    dbData.new_plantation_count = dbData.new_trees;
+    delete dbData.new_trees;
+  }
+
+  // Sanitize empty strings to null to prevent Postgres type-casting errors (HTTP 400)
+  for (const key in dbData) {
+    if (dbData[key] === "") {
+      dbData[key] = null;
+    }
+  }
+
   const { data: report, error } = await supabase
     .from('project_monitoring_reports')
-    .insert(reportData)
+    .insert(dbData)
     .select('*, projects (name, owner_id), project_monitoring_assignments (company_id)')
     .single();
 
   if (error || !report) {
     console.error('Error submitting monitoring report:', error);
-    throw error;
+    throw new Error(error?.message || JSON.stringify(error) || 'Unknown database error');
   }
 
   const monthYear = new Date(reportData.report_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });

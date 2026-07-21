@@ -174,6 +174,7 @@ export function MonitoringWizard({ assignment, onComplete }: { assignment: any; 
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    toast({ title: 'Submitting Report...', description: 'Please wait, saving your monitoring report and creating media albums.', duration: 5000 });
     try {
       await submitMonitoringReport({
         assignment_id: assignment.id,
