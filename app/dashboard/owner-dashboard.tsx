@@ -9,9 +9,12 @@ import { ProjectCard } from '@/components/shared/project-card';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FolderKanban, Sprout, ShieldCheck, Award, DollarSign, Bell, ArrowRight, Plus, Search, Building2, FileText, CheckCircle2 } from 'lucide-react';
+import { FolderKanban, Sprout, ShieldCheck, Award, DollarSign, Bell, ArrowRight, Plus, Search, Building2, FileText, CheckCircle2, Handshake, Coins, Clock, Loader2, XCircle } from 'lucide-react';
 import { UpcomingEventsWidget } from '@/components/shared/calendar/UpcomingEventsWidget';
 import { getRoleLabel } from '@/lib/navigation';
+import { supabase } from '@/lib/supabase/client';
+import { sendNotification } from '@/lib/voc-services';
+import { toast } from 'sonner';
 
 const QUICK_ACTIONS = [
   { label: 'Register New Project', href: '/dashboard/projects/new', icon: Plus, color: 'text-primary' },
@@ -21,9 +24,24 @@ const QUICK_ACTIONS = [
 ];
 
 export default function OwnerDashboard() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { projects, loading } = useProjects();
   const { notifications } = useNotifications();
+  const [pendingRequests, setPendingRequests] = React.useState<any[]>([]);
+  const [actingId, setActingId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from('project_partnerships')
+        .select('id, project_id, company_id, company:profiles!project_partnerships_company_id_fkey(full_name, organization), service_type, budget_usd, message, created_at, project:projects(name)')
+        .eq('owner_id', user.id)
+        .eq('status', 'pending_owner')
+        .order('created_at', { ascending: false });
+      if (data) setPendingRequests(data);
+    })();
+  }, [user]);
 
   const firstName = (profile?.full_name || 'there').split(' ')[0];
   const activeProjects = projects.filter((p) => p.status === 'active' || p.status === 'verified').length;
@@ -32,6 +50,72 @@ export default function OwnerDashboard() {
   ).length;
   const passportsIssued = projects.filter((p) => p.passport_issued_at).length;
   const unreadNotifications = notifications.filter((n) => !n.read).length;
+
+  const handleAccept = async (req: any) => {
+    setActingId(req.id);
+    try {
+      const { error } = await supabase
+        .from('project_partnerships')
+        .update({ status: 'active', started_at: new Date().toISOString() })
+        .eq('id', req.id);
+      if (error) throw error;
+
+      const companyName = req.company?.full_name || 'Partner';
+      await supabase.from('project_activity').insert({
+        project_id: req.project_id,
+        actor_id: user?.id,
+        event_type: 'partnership_established',
+        title: 'Partnership Accepted',
+        description: `Accepted monitoring partnership with ${companyName}`,
+      });
+
+      await sendNotification({
+        title: 'Partnership Accepted',
+        body: `Your monitoring partnership request has been accepted.`,
+        type: 'partnership_accepted',
+        targetUserId: req.company_id,
+        link: `/dashboard/projects/${req.project_id}`,
+      });
+
+      toast.success('Partnership accepted.');
+      setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed');
+    } finally { setActingId(null); }
+  };
+
+  const handleReject = async (req: any) => {
+    setActingId(req.id);
+    try {
+      const { error } = await supabase
+        .from('project_partnerships')
+        .update({ status: 'rejected' })
+        .eq('id', req.id);
+      if (error) throw error;
+
+      const companyName = req.company?.full_name || 'Partner';
+      await supabase.from('project_activity').insert({
+        project_id: req.project_id,
+        actor_id: user?.id,
+        event_type: 'partnership_terminated',
+        title: 'Partnership Rejected',
+        description: `Rejected monitoring partnership request from ${companyName}`,
+      });
+
+      await sendNotification({
+        title: 'Partnership Rejected',
+        body: `Your monitoring partnership request has been declined.`,
+        type: 'verification',
+        targetUserId: req.company_id,
+        link: `/dashboard/projects/${req.project_id}`,
+      });
+
+      toast.success('Request rejected.');
+      setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed');
+    } finally { setActingId(null); }
+  };
 
   return (
     <div className="space-y-6">
@@ -63,6 +147,56 @@ export default function OwnerDashboard() {
           );
         })}
       </div>
+
+      {pendingRequests.length > 0 && (
+        <Card className="p-5 border-amber-200 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/10">
+          <div className="flex items-center gap-2 mb-4">
+            <Handshake className="h-4.5 w-4.5 text-amber-600" />
+            <h3 className="font-semibold">Pending Partnership Requests</h3>
+            <Badge className="ml-1 bg-amber-100 text-amber-700 border-amber-200 text-[10px]">{pendingRequests.length}</Badge>
+          </div>
+          <div className="space-y-3">
+            {pendingRequests.map((req) => {
+              const company = req.company;
+              const projectName = req.project?.name || 'Unknown Project';
+              return (
+                <div key={req.id} className="flex items-start gap-3 p-3 rounded-lg border border-amber-200/60 bg-white dark:bg-slate-900 dark:border-amber-800/30">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                    <Building2 className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{company?.full_name || 'Unknown Company'}</p>
+                    <Link href={`/dashboard/projects/${req.project_id}`} className="text-xs text-primary hover:underline">{projectName}</Link>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{req.service_type}</span>
+                      {req.budget_usd && <span className="flex items-center gap-0.5"><Coins className="h-2.5 w-2.5" />${req.budget_usd.toLocaleString()}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => handleAccept(req)}
+                      disabled={actingId === req.id}
+                    >
+                      {actingId === req.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle2 className="h-3 w-3 mr-0.5" /> Accept</>}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px] text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => handleReject(req)}
+                      disabled={actingId === req.id}
+                    >
+                      <XCircle className="h-3 w-3 mr-0.5" /> Decline
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

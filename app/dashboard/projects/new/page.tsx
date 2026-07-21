@@ -152,7 +152,8 @@ export default function NewProjectPage() {
     setLoading(true);
     setUploadProgress(0);
     try {
-      const slug = slugify(values.name);
+      const baseSlug = slugify(values.name);
+      const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 8)}`;
       
       const insertData = {
         name: values.name,

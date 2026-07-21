@@ -6,6 +6,9 @@ import { useProject } from '@/hooks/use-projects';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/components/providers/auth-provider';
 import type { ProjectGalleryItem, ProjectAlbum } from '@/lib/types';
+import type { AuditMediaItem, GalleryAlbum } from '@/lib/voc-types';
+import { AUDIT_MEDIA_TYPE_LABELS, AUDIT_MEDIA_TYPE_COLORS } from '@/lib/voc-types';
+import { getAuditMediaSignedUrls } from '@/lib/voc-services';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,6 +44,11 @@ import {
   X,
   Play,
   Info,
+  Shield,
+  Lock,
+  Plane,
+  Satellite,
+  Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,19 +57,24 @@ export default function EvidencePage() {
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { profile } = useAuth();
+  const isPartner = profile?.role === 'sustainability_partner';
 
   const [albums, setAlbums] = React.useState<ProjectAlbum[]>([]);
   const [items, setItems] = React.useState<ProjectGalleryItem[]>([]);
+  const [auditAlbums, setAuditAlbums] = React.useState<GalleryAlbum[]>([]);
+  const [auditMedia, setAuditMedia] = React.useState<AuditMediaItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [view, setView] = React.useState<'grid' | 'timeline'>('grid');
   const [selectedAlbum, setSelectedAlbum] = React.useState<string>('all');
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
   const [isAlbumDialogOpen, setIsAlbumDialogOpen] = React.useState(false);
+  const [previewMedia, setPreviewMedia] = React.useState<AuditMediaItem | null>(null);
+  const [previewItem, setPreviewItem] = React.useState<ProjectGalleryItem | null>(null);
 
   const fetchData = React.useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
-    const [albumsRes, itemsRes] = await Promise.all([
+    const [albumsRes, itemsRes, auditAlbumsRes, auditMediaRes] = await Promise.all([
       supabase
         .from('project_albums')
         .select('*')
@@ -71,9 +85,27 @@ export default function EvidencePage() {
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('gallery_albums')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('audit_media')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('captured_at', { ascending: false }),
     ]);
     setAlbums((albumsRes.data as ProjectAlbum[]) || []);
     setItems((itemsRes.data as ProjectGalleryItem[]) || []);
+    setAuditAlbums((auditAlbumsRes.data as GalleryAlbum[]) || []);
+    const rawAuditMedia = (auditMediaRes.data as AuditMediaItem[]) || [];
+    if (rawAuditMedia.length > 0) {
+      const withSignedUrls = await getAuditMediaSignedUrls(rawAuditMedia);
+      setAuditMedia(withSignedUrls);
+    } else {
+      setAuditMedia([]);
+    }
     setLoading(false);
   }, [projectId]);
 
@@ -83,16 +115,46 @@ export default function EvidencePage() {
 
   const filteredItems = React.useMemo(() => {
     if (selectedAlbum === 'all') return items;
+    if (selectedAlbum.startsWith('audit-')) {
+      const albumId = selectedAlbum.replace('audit-', '');
+      return auditMedia
+        .filter((m) => m.album_id === albumId)
+        .map((m) => ({
+          id: m.id,
+          project_id: m.project_id,
+          album_id: '',
+          uploaded_by: m.uploaded_by,
+          uploader_name: m.verifier_name || null,
+          media_type: m.media_type === 'drone_video' ? ('video' as const) : ('image' as const),
+          file_name: m.file_name,
+          file_size: m.file_size,
+          mime_type: m.mime_type,
+          storage_path: m.storage_path,
+          public_url: m.url || null,
+          caption: m.field_notes || null,
+          location_name: null,
+          latitude: m.latitude,
+          longitude: m.longitude,
+          created_at: m.uploaded_at,
+        })) as ProjectGalleryItem[];
+    }
     return items.filter((item) => item.album_id === selectedAlbum);
-  }, [items, selectedAlbum]);
+  }, [items, auditMedia, selectedAlbum]);
 
   const albumItemCount = React.useCallback(
     (albumId: string) => items.filter((i) => i.album_id === albumId).length,
     [items]
   );
 
+  const auditAlbumItemCount = React.useCallback(
+    (albumId: string) => auditMedia.filter((m) => m.album_id === albumId).length,
+    [auditMedia]
+  );
+
   const imageCount = items.filter((i) => i.media_type === 'image').length;
   const videoCount = items.filter((i) => i.media_type === 'video').length;
+  const auditImageCount = auditMedia.filter((m) => m.media_type === 'photo' || m.media_type === 'drone_image' || m.media_type === 'satellite').length;
+  const auditVideoCount = auditMedia.filter((m) => m.media_type === 'drone_video').length;
 
   const timelineGroups = React.useMemo(() => {
     const groups: Record<string, ProjectGalleryItem[]> = {};
@@ -126,9 +188,10 @@ export default function EvidencePage() {
         <div>
           <h1 className="font-display text-xl font-semibold">Project Gallery</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Field photos, drone images, and videos
+            {isPartner ? 'Browse all project media — uploads, audits, drone surveys, and satellite imagery' : 'Field photos, drone images, and videos'}
           </p>
         </div>
+        {!isPartner && (
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700 text-white">
@@ -149,6 +212,7 @@ export default function EvidencePage() {
             />
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Album Bar */}
@@ -162,7 +226,7 @@ export default function EvidencePage() {
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
           )}
         >
-          All ({items.length})
+          All ({items.length + auditMedia.length})
         </button>
         {albums.map((album) => (
           <button
@@ -178,6 +242,30 @@ export default function EvidencePage() {
             {album.name} ({albumItemCount(album.id)})
           </button>
         ))}
+        {auditAlbums.length > 0 && (
+          <>
+            <div className="h-4 w-px bg-slate-300 dark:bg-slate-600 shrink-0" />
+            {auditAlbums.map((album) => (
+              <button
+                key={`audit-${album.id}`}
+                onClick={() => setSelectedAlbum(`audit-${album.id}`)}
+                className={cn(
+                  'shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors flex items-center gap-1.5',
+                  selectedAlbum === `audit-${album.id}`
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40'
+                )}
+              >
+                <Shield className="h-3 w-3" />
+                {album.title} ({auditAlbumItemCount(album.id)})
+                <Badge variant="outline" className="text-[10px] px-1 py-0 border-current opacity-70">
+                  Audit
+                </Badge>
+              </button>
+            ))}
+          </>
+        )}
+        {!isPartner && (
         <button
           onClick={() => setIsAlbumDialogOpen(true)}
           className="shrink-0 rounded-full px-4 py-1.5 text-sm font-medium bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
@@ -185,6 +273,7 @@ export default function EvidencePage() {
           <Plus className="inline h-3.5 w-3.5 mr-1" />
           New Album
         </button>
+        )}
       </div>
 
       {/* View Toggle + Stats */}
@@ -218,24 +307,41 @@ export default function EvidencePage() {
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <FolderOpen className="h-3.5 w-3.5" />
-            {items.length} items
+            {items.length + auditMedia.length} items
           </span>
           <span className="flex items-center gap-1.5">
             <ImageIcon className="h-3.5 w-3.5" />
-            {imageCount} images
+            {imageCount + auditImageCount} images
           </span>
           <span className="flex items-center gap-1.5">
             <Video className="h-3.5 w-3.5" />
-            {videoCount} videos
+            {videoCount + auditVideoCount} videos
           </span>
           <span className="flex items-center gap-1.5">
             <FolderOpen className="h-3.5 w-3.5" />
-            {albums.length} albums
+            {albums.length + auditAlbums.length} albums
           </span>
+          {auditMedia.length > 0 && (
+            <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+              <Shield className="h-3.5 w-3.5" />
+              {auditMedia.length} audit evidence
+            </span>
+          )}
         </div>
       </div>
 
       {/* Content */}
+      {selectedAlbum.startsWith('audit-') && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+          <Lock className="h-5 w-5 text-blue-600 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Audit Evidence (Read-Only)</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              This evidence was collected by the verification agency during their field audit. It cannot be modified or deleted by the project owner.
+            </p>
+          </div>
+        </div>
+      )}
       {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -264,7 +370,14 @@ export default function EvidencePage() {
       ) : view === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {filteredItems.map((item) => (
-            <GalleryCard key={item.id} item={item} />
+            <GalleryCard key={item.id} item={item} isAudit={selectedAlbum.startsWith('audit-')} onClick={() => {
+              if (selectedAlbum.startsWith('audit-')) {
+                const am = auditMedia.find((a) => a.id === item.id);
+                if (am) setPreviewMedia(am);
+              } else {
+                setPreviewItem(item);
+              }
+            }} />
           ))}
         </div>
       ) : (
@@ -277,7 +390,14 @@ export default function EvidencePage() {
               </h3>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {dateItems.map((item) => (
-                  <GalleryCard key={item.id} item={item} />
+                  <GalleryCard key={item.id} item={item} isAudit={selectedAlbum.startsWith('audit-')} onClick={() => {
+                    if (selectedAlbum.startsWith('audit-')) {
+                      const am = auditMedia.find((a) => a.id === item.id);
+                      if (am) setPreviewMedia(am);
+                    } else {
+                      setPreviewItem(item);
+                    }
+                  }} />
                 ))}
               </div>
             </div>
@@ -298,21 +418,171 @@ export default function EvidencePage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Audit Media Preview Dialog */}
+      <Dialog open={!!previewMedia} onOpenChange={(open) => !open && setPreviewMedia(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          {previewMedia && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  Audit Evidence Preview
+                </DialogTitle>
+                <DialogDescription>{previewMedia.file_name}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {previewMedia.media_type === 'drone_video' ? (
+                  <div className="rounded-lg overflow-hidden bg-black">
+                    <video
+                      src={previewMedia.url}
+                      controls
+                      className="w-full max-h-[60vh]"
+                      preload="metadata"
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    <img
+                      src={previewMedia.url}
+                      alt={previewMedia.file_name || 'Audit evidence'}
+                      className="w-full max-h-[60vh] object-contain"
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-muted-foreground">Type:</span>{' '}
+                      <Badge className={cn('text-xs', AUDIT_MEDIA_TYPE_COLORS[previewMedia.media_type])}>
+                        {AUDIT_MEDIA_TYPE_LABELS[previewMedia.media_type]}
+                      </Badge>
+                    </div>
+                    {previewMedia.latitude && previewMedia.longitude && (
+                      <div>
+                        <span className="text-muted-foreground">GPS:</span>{' '}
+                        {previewMedia.latitude.toFixed(6)}, {previewMedia.longitude.toFixed(6)}
+                      </div>
+                    )}
+                    {previewMedia.description && (
+                      <div>
+                        <span className="text-muted-foreground">Description:</span> {previewMedia.description}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-muted-foreground">Captured:</span>{' '}
+                      {previewMedia.captured_at ? new Date(previewMedia.captured_at).toLocaleString() : new Date(previewMedia.uploaded_at).toLocaleString()}
+                    </div>
+                    {previewMedia.file_size && (
+                      <div>
+                        <span className="text-muted-foreground">Size:</span>{' '}
+                        {(previewMedia.file_size / 1024 / 1024).toFixed(1)} MB
+                      </div>
+                    )}
+                    {previewMedia.field_notes && (
+                      <div>
+                        <span className="text-muted-foreground">Notes:</span> {previewMedia.field_notes}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Gallery Item Preview Dialog */}
+      <Dialog open={!!previewItem} onOpenChange={(open) => !open && setPreviewItem(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          {previewItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{previewItem.file_name || 'Gallery Item'}</DialogTitle>
+                {previewItem.caption && <DialogDescription>{previewItem.caption}</DialogDescription>}
+              </DialogHeader>
+              <div className="space-y-4">
+                {previewItem.media_type === 'video' ? (
+                  <div className="rounded-lg overflow-hidden bg-black">
+                    {previewItem.public_url ? (
+                      <video
+                        src={previewItem.public_url}
+                        controls
+                        className="w-full max-h-[60vh]"
+                        preload="metadata"
+                      />
+                    ) : (
+                      <div className="flex h-48 items-center justify-center text-white/50">
+                        <Play className="h-12 w-12" />
+                      </div>
+                    )}
+                  </div>
+                ) : previewItem.public_url ? (
+                  <div className="rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    <img
+                      src={previewItem.public_url}
+                      alt={previewItem.file_name || 'Gallery image'}
+                      className="w-full max-h-[60vh] object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-48 items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-muted-foreground">Uploaded:</span>{' '}
+                      {new Date(previewItem.created_at).toLocaleString()}
+                    </div>
+                    {previewItem.file_size && (
+                      <div>
+                        <span className="text-muted-foreground">Size:</span>{' '}
+                        {(previewItem.file_size / 1024 / 1024).toFixed(1)} MB
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {previewItem.location_name && (
+                      <div>
+                        <span className="text-muted-foreground">Location:</span>{' '}
+                        {previewItem.location_name}
+                      </div>
+                    )}
+                    {previewItem.uploader_name && (
+                      <div>
+                        <span className="text-muted-foreground">Uploader:</span>{' '}
+                        {previewItem.uploader_name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function GalleryCard({ item }: { item: ProjectGalleryItem }) {
+function GalleryCard({ item, isAudit, onClick }: { item: ProjectGalleryItem; isAudit?: boolean; onClick?: () => void }) {
   const [hovered, setHovered] = React.useState(false);
 
   return (
     <div
       className={cn(
         'rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-200',
-        hovered && 'shadow-lg scale-[1.02]'
+        hovered && 'shadow-lg scale-[1.02]',
+        isAudit && 'border-blue-200 dark:border-blue-800',
+        onClick && 'cursor-pointer'
       )}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
     >
       <div className="aspect-square overflow-hidden relative bg-slate-100 dark:bg-slate-800">
         {item.media_type === 'image' && item.public_url ? (
@@ -346,7 +616,12 @@ function GalleryCard({ item }: { item: ProjectGalleryItem }) {
         )}
       </div>
       <div className="p-3 space-y-1">
-        <p className="truncate text-sm font-medium">{item.file_name || 'Untitled'}</p>
+        <div className="flex items-center gap-1.5">
+          {isAudit && (
+            <Shield className="h-3 w-3 text-blue-600 shrink-0" />
+          )}
+          <p className="truncate text-sm font-medium">{item.file_name || 'Untitled'}</p>
+        </div>
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="h-3 w-3" />
           {new Date(item.created_at).toLocaleDateString('en-US', {

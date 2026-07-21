@@ -77,6 +77,7 @@ export default function DocumentsPage() {
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { profile } = useAuth();
+  const isPartner = profile?.role === 'sustainability_partner';
   const [activeApp, setActiveApp] = React.useState<import('@/lib/voc-types').VerificationApplication | undefined>(undefined);
   const isLocked = !!activeApp || project?.verification_status === 'approved';
 
@@ -169,9 +170,10 @@ export default function DocumentsPage() {
         <div>
           <h1 className="font-display text-xl font-semibold">Project Documents</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Organized by category with verification workflow
+            {isPartner ? 'View project registration documents' : 'Organized by category with verification workflow'}
           </p>
         </div>
+        {!isPartner && (
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={isLocked}>
@@ -190,6 +192,7 @@ export default function DocumentsPage() {
             />
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
@@ -526,7 +529,7 @@ function UploadDocumentDialog({
   const [file, setFile] = React.useState<File | null>(null);
   const [uploading, setUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   const handleUpload = async () => {
     if (!category) {
@@ -560,7 +563,7 @@ function UploadDocumentDialog({
         .from('project_documents_v2')
         .insert({
           project_id: projectId,
-          uploaded_by: profile?.id || '',
+          uploaded_by: user?.id || profile?.id,
           category,
           document_name: documentName.trim(),
           description: description.trim() || null,

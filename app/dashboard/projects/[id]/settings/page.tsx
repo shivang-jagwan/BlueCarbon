@@ -43,12 +43,16 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { PROJECT_TYPE_LABELS, type ProjectType } from '@/lib/types';
+import { useAuth } from '@/components/providers/auth-provider';
+import { Eye } from 'lucide-react';
 
 export default function ProjectSettingsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const router = useRouter();
   const { project, loading } = useProject(projectId);
+  const { profile } = useAuth();
+  const isPartner = profile?.role === 'sustainability_partner';
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
@@ -193,6 +197,48 @@ export default function ProjectSettingsPage() {
   }
 
   if (!project) return null;
+
+  // Read-only view for Sustainability Partners
+  if (isPartner) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div>
+          <h1 className="font-display text-xl font-semibold">Project Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" />
+            Read-only — Settings can only be modified by the Project Owner
+          </p>
+        </div>
+
+        <Card className="p-6">
+          <h2 className="mb-4 font-semibold">General</h2>
+          <div className="space-y-4">
+            <div>
+              <Label>Project Name</Label>
+              <div className="mt-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">{project.name}</div>
+            </div>
+            <div>
+              <Label>Description</Label>
+              <div className="mt-1.5 min-h-20 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">{project.description || 'No description'}</div>
+            </div>
+            <div>
+              <Label>Project Type</Label>
+              <div className="mt-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">{PROJECT_TYPE_LABELS[project.project_type]}</div>
+            </div>
+          </div>
+        </Card>
+
+        {project.cover_image_url && (
+          <Card className="p-6">
+            <h2 className="mb-4 font-semibold">Cover Image</h2>
+            <div className="relative h-40 w-full overflow-hidden rounded-lg border border-border">
+              <Image src={project.cover_image_url} alt="Project cover" fill className="object-cover" />
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

@@ -541,7 +541,7 @@ export const AGENCY_VERIFICATION_STATUS_DOT_COLORS: Record<AgencyVerificationSta
 
 // ── Carbon Passport Applications ───────────────────────────
 
-export type CarbonPassportStatus = 'none' | 'requested' | 'under_processing' | 'issued';
+export type CarbonPassportStatus = 'none' | 'requested' | 'under_processing' | 'issued' | 'rejected';
 
 export interface CarbonPassportApplication {
   id: string;
@@ -568,6 +568,7 @@ export const CARBON_PASSPORT_STATUS_LABELS: Record<CarbonPassportStatus, string>
   requested: 'Passport Requested',
   under_processing: 'Under Processing',
   issued: 'Passport Issued',
+  rejected: 'Rejected',
 };
 
 export const CARBON_PASSPORT_STATUS_COLORS: Record<CarbonPassportStatus, string> = {
@@ -575,6 +576,7 @@ export const CARBON_PASSPORT_STATUS_COLORS: Record<CarbonPassportStatus, string>
   requested: 'bg-amber-100 text-amber-700',
   under_processing: 'bg-blue-100 text-blue-700',
   issued: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-red-100 text-red-700',
 };
 
 export const CARBON_PASSPORT_STATUS_DOT_COLORS: Record<CarbonPassportStatus, string> = {
@@ -582,4 +584,87 @@ export const CARBON_PASSPORT_STATUS_DOT_COLORS: Record<CarbonPassportStatus, str
   requested: 'bg-amber-500',
   under_processing: 'bg-blue-500',
   issued: 'bg-emerald-500',
+  rejected: 'bg-red-500',
+};
+
+// ── Geospatial Evidence ─────────────────────────────────────
+export type AuditMediaType = 'photo' | 'drone_image' | 'drone_video' | 'satellite';
+export type GalleryAlbumType = 'monitoring' | 'audit';
+
+export interface AuditMediaItem {
+  id: string;
+  project_id: string;
+  verification_id: string | null;
+  audit_id: string | null;
+  album_id: string | null;
+  media_type: AuditMediaType;
+  storage_path: string;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy_meters: number | null;
+  altitude_meters: number | null;
+  device_name: string | null;
+  uploaded_by: string | null;
+  verifier_name: string | null;
+  uploaded_at: string;
+  captured_at: string | null;
+  flight_date: string | null;
+  satellite_date: string | null;
+  description: string | null;
+  field_notes: string | null;
+  metadata: Record<string, unknown>;
+  url?: string;
+}
+
+export interface GalleryAlbum {
+  id: string;
+  project_id: string;
+  verification_id: string | null;
+  audit_id: string | null;
+  album_type: GalleryAlbumType;
+  title: string;
+  description: string | null;
+  agency_name: string | null;
+  verifier_name: string | null;
+  audit_date: string | null;
+  created_by: string | null;
+  created_at: string;
+  media_count?: number;
+  items?: AuditMediaItem[];
+}
+
+export interface AuditLocationCapture {
+  id: string;
+  audit_id: string | null;
+  project_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy_meters: number | null;
+  altitude_meters: number | null;
+  captured_by: string | null;
+  verifier_name: string | null;
+  captured_at: string;
+  description: string | null;
+}
+
+export const AUDIT_MEDIA_TYPE_LABELS: Record<AuditMediaType, string> = {
+  photo: 'Geo-tagged Photo',
+  drone_image: 'Drone Image',
+  drone_video: 'Drone Video',
+  satellite: 'Satellite Imagery',
+};
+
+export const AUDIT_MEDIA_TYPE_COLORS: Record<AuditMediaType, string> = {
+  photo: 'bg-emerald-100 text-emerald-700',
+  drone_image: 'bg-blue-100 text-blue-700',
+  drone_video: 'bg-purple-100 text-purple-700',
+  satellite: 'bg-amber-100 text-amber-700',
+};
+
+export const GALLERY_ALBUM_TYPE_LABELS: Record<GalleryAlbumType, string> = {
+  monitoring: 'Monitoring Album',
+  audit: 'Audit Album',
 };

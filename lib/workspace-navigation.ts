@@ -8,18 +8,8 @@ import {
   BarChart3,
   Award,
   Settings,
-  Eye,
-  FolderOpen,
   CheckCircle2,
-  Camera,
-  Sparkles,
-  Gavel,
-  MessageSquare,
   Calendar,
-  TrendingUp,
-  Activity,
-  Building2,
-  Download,
   FileBarChart,
   Send,
   type LucideIcon,
@@ -139,22 +129,19 @@ export const PARTNER_WORKSPACE_NAV: WorkspaceNavSection[] = [
   {
     title: 'Monitoring',
     items: [
-      { label: 'Monitoring Projects', href: '/monitoring', icon: Activity },
-      { label: 'Monitoring Reports', href: '/monitoring', icon: ClipboardList, badge: 'Read Only' },
+      { label: 'Monitoring Reports', href: '/monitoring', icon: ClipboardList },
+    ],
+  },
+  {
+    title: 'Gallery',
+    items: [
       { label: 'Project Gallery', href: '/evidence', icon: Image },
     ],
   },
   {
     title: 'Engagement',
     items: [
-      { label: 'Documents', href: '/documents', icon: FolderOpen },
       { label: 'Reports', href: '/reports', icon: FileBarChart },
-    ],
-  },
-  {
-    title: 'Settings',
-    items: [
-      { label: 'Project Settings', href: '/settings', icon: Settings },
     ],
   },
 ];

@@ -2,91 +2,116 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Search,
+  History,
   CheckCircle2,
   RotateCcw,
   XCircle,
   Clock,
-  History,
-  Award,
-  Shield,
+  FileText,
+  Filter,
+  Search,
+  ArrowUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getHistoryApplications } from '@/lib/voc-services';
+import { useAuth } from '@/components/providers/auth-provider';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
-  DECISION_LABELS,
-  DECISION_COLORS,
   type VerificationApplication,
 } from '@/lib/voc-types';
 
-const DECISION_ICONS: Record<string, React.ReactNode> = {
-  approve: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
-  return_for_revision: <RotateCcw className="h-4 w-4 text-amber-600" />,
-  reject: <XCircle className="h-4 w-4 text-red-600" />,
+const STATUS_ICONS: Record<string, React.ElementType> = {
+  approved: CheckCircle2,
+  returned_for_revision: RotateCcw,
+  rejected: XCircle,
 };
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'returned_for_revision', label: 'Returned for Revision' },
-  { value: 'rejected', label: 'Rejected' },
-];
+type FilterType = 'all' | 'approved' | 'returned_for_revision' | 'rejected';
 
-const DECISION_OPTIONS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All Decisions' },
-  { value: 'approve', label: 'Approved' },
-  { value: 'return_for_revision', label: 'Returned' },
-  { value: 'reject', label: 'Rejected' },
+const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'returned_for_revision', label: 'Returned' },
+  { value: 'rejected', label: 'Rejected' },
 ];
 
 export default function VerificationHistoryPage() {
   const router = useRouter();
-  const [applications, setApplications] = React.useState<VerificationApplication[]>([]);
+  const { profile } = useAuth();
+
+  const [allCompleted, setAllCompleted] = React.useState<VerificationApplication[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [filter, setFilter] = React.useState<FilterType>('all');
   const [search, setSearch] = React.useState('');
-  const [decisionFilter, setDecisionFilter] = React.useState('all');
-  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [sortNewest, setSortNewest] = React.useState(true);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      const data = await getHistoryApplications();
-      if (!cancelled) setApplications(data);
+      try {
+        const voc = await import('@/lib/voc-services');
+        const all = await voc.getAllApplicationsForDashboard();
+        const completed = all.filter(a =>
+          ['approved', 'returned_for_revision', 'rejected'].includes(a.status)
+        );
+        if (!cancelled) {
+          if (profile) {
+            const agency = await voc.getAgencyForProfile(profile.id);
+            setAllCompleted(agency ? completed.filter(a => a.verification_agency_id === agency.id) : completed);
+          } else {
+            setAllCompleted(completed);
+          }
+        }
+      } catch { /* skip */ }
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [profile]);
 
   const filtered = React.useMemo(() => {
-    return applications.filter((app) => {
-      const query = search.toLowerCase();
-      const matchesSearch =
-        query === '' ||
-        app.application_number.toLowerCase().includes(query) ||
-        app.project_name.toLowerCase().includes(query) ||
-        app.verifier_name?.toLowerCase().includes(query);
-      const matchesDecision =
-        decisionFilter === 'all' || app.decision === decisionFilter;
-      const matchesStatus =
-        statusFilter === 'all' || app.status === statusFilter;
-      return matchesSearch && matchesDecision && matchesStatus;
+    let result = allCompleted;
+    if (filter !== 'all') {
+      result = result.filter(a => a.status === filter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(a =>
+        a.project_name.toLowerCase().includes(q) ||
+        a.ngo_name.toLowerCase().includes(q) ||
+        a.application_number.toLowerCase().includes(q) ||
+        a.project_owner_name.toLowerCase().includes(q)
+      );
+    }
+    result.sort((a, b) => {
+      const da = new Date(a.submitted_date).getTime();
+      const db = new Date(b.submitted_date).getTime();
+      return sortNewest ? db - da : da - db;
     });
-  }, [applications, search, decisionFilter, statusFilter]);
+    return result;
+  }, [allCompleted, filter, search, sortNewest]);
+
+  const counts = React.useMemo(() => ({
+    all: allCompleted.length,
+    approved: allCompleted.filter(a => a.status === 'approved').length,
+    returned_for_revision: allCompleted.filter(a => a.status === 'returned_for_revision').length,
+    rejected: allCompleted.filter(a => a.status === 'rejected').length,
+  }), [allCompleted]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Clock className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
           <History className="h-5 w-5 text-primary" />
@@ -96,145 +121,129 @@ export default function VerificationHistoryPage() {
             Verification History
           </h1>
           <p className="text-sm text-muted-foreground">
-            Immutable record of all completed verification applications.
+            All completed verification requests — approved, returned, and rejected.
           </p>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[240px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by number, project, or verifier..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={decisionFilter} onValueChange={setDecisionFilter}>
-          <SelectTrigger className="w-[170px]">
-            <SelectValue placeholder="Decision" />
-          </SelectTrigger>
-          <SelectContent>
-            {DECISION_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[185px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Status Filter Tabs */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTER_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setFilter(opt.value)}
+            className={cn(
+              'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+              filter === opt.value
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            {opt.label}
+            <span className="ml-1.5 text-[10px] opacity-70">{counts[opt.value]}</span>
+          </button>
+        ))}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-      </p>
+      {/* Search + Sort */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by project, agency, owner..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSortNewest(prev => !prev)}
+          className="gap-1.5 shrink-0"
+        >
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          {sortNewest ? 'Newest First' : 'Oldest First'}
+        </Button>
+      </div>
 
-      <div className="space-y-3">
-        {filtered.map((app) => (
-          <Card
-            key={app.id}
-            className="group cursor-pointer transition-shadow hover:shadow-md"
-            onClick={() =>
-              router.push(`/dashboard/verification/workspace/${app.id}`)
-            }
-          >
-            <CardContent className="p-5">
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  {app.decision
-                    ? DECISION_ICONS[app.decision]
-                    : <Clock className="h-4 w-4 text-muted-foreground" />}
+      {/* Results */}
+      {filtered.length === 0 ? (
+        <Card className="shadow-sm">
+          <CardContent className="py-16 text-center">
+            <History className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+            <p className="text-sm text-muted-foreground">
+              {allCompleted.length === 0
+                ? 'No completed verifications yet.'
+                : 'No results match your search.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(app => {
+            const StatusIcon = STATUS_ICONS[app.status] || CheckCircle2;
+            return (
+              <div
+                key={app.id}
+                className="flex items-center gap-4 p-4 rounded-xl border border-border/60 hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => router.push(`/dashboard/verification/${app.id}`)}
+              >
+                <div
+                  className={cn(
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                    app.status === 'approved' && 'bg-emerald-50',
+                    app.status === 'returned_for_revision' && 'bg-amber-50',
+                    app.status === 'rejected' && 'bg-red-50'
+                  )}
+                >
+                  <StatusIcon
+                    className={cn(
+                      'h-5 w-5',
+                      app.status === 'approved' && 'text-emerald-600',
+                      app.status === 'returned_for_revision' && 'text-amber-600',
+                      app.status === 'rejected' && 'text-red-600'
+                    )}
+                  />
                 </div>
-
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-muted-foreground">
                       {app.application_number}
                     </span>
-                    {app.decision ? (
-                      <Badge
-                        className={cn(
-                          'text-[10px] font-medium',
-                          DECISION_COLORS[app.decision]
-                        )}
-                      >
-                        {DECISION_LABELS[app.decision]}
-                      </Badge>
-                    ) : (
-                      <Badge
-                        className={cn(
-                          'text-[10px] font-medium',
-                          APPLICATION_STATUS_COLORS[app.status]
-                        )}
-                      >
-                        {APPLICATION_STATUS_LABELS[app.status]}
-                      </Badge>
-                    )}
-                    {app.decision === 'approve' && app.carbon_passport && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-medium border-emerald-200 bg-emerald-50 text-emerald-700"
-                      >
-                        <Award className="mr-1 h-3 w-3" />
-                        Carbon Passport
+                    {app.field_audit_required === 'yes' && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        Field Audit
                       </Badge>
                     )}
                   </div>
-
-                  <p className="text-sm font-medium truncate">
+                  <p className="text-sm font-medium truncate mt-0.5">
                     {app.project_name}
                   </p>
-
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {app.decision_notes || 'No decision notes'}
+                  <p className="text-xs text-muted-foreground">
+                    {app.ngo_name} — {app.project_owner_name}
                   </p>
                 </div>
-
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="text-right shrink-0">
+                  <Badge
+                    className={cn(
+                      'text-[10px]',
+                      APPLICATION_STATUS_COLORS[app.status]
+                    )}
+                  >
+                    {APPLICATION_STATUS_LABELS[app.status]}
+                  </Badge>
+                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 justify-end">
                     <Clock className="h-3 w-3" />
-                    {app.decision_date
-                      ? new Date(app.decision_date).toLocaleDateString()
-                      : '—'}
-                  </span>
-                  {app.decision === 'approve' && (
-                    <div className="flex items-center gap-1 text-xs text-emerald-600">
-                      <Shield className="h-3 w-3" />
-                      <span className="font-medium">Verified</span>
-                    </div>
-                  )}
+                    {new Date(app.submitted_date).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
-              <History className="h-6 w-6 text-muted-foreground/50" />
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">
-              No history records found
-            </p>
-            <p className="text-xs text-muted-foreground/70 mt-1">
-              Try adjusting your search or filters.
-            </p>
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

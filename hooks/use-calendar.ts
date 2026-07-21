@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { sendNotification } from '@/lib/voc-services';
 import type { CalendarEvent } from '@/lib/types';
 import { toast } from 'sonner';
 
@@ -54,11 +55,11 @@ export async function createEvent(eventData: Partial<CalendarEvent>) {
 
     // Send Notification
     if (eventData.assigned_to && eventData.assigned_to !== eventData.created_by) {
-      await supabase.from('notifications').insert({
-        user_id: eventData.assigned_to,
+      await sendNotification({
         title: 'New Calendar Event Assigned',
         body: `You have been assigned to: ${eventData.title}`,
         type: 'event',
+        targetUserId: eventData.assigned_to,
         link: '/dashboard/calendar',
       });
     }

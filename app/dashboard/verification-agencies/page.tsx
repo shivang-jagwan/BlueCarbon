@@ -14,11 +14,13 @@ import { Separator } from '@/components/ui/separator';
 import {
   Search, ShieldCheck, Building2, MapPin, Globe, Clock,
   CheckCircle2, ArrowRight, Briefcase, Users, CalendarClock,
-  Filter, ChevronDown, ChevronUp, DollarSign,
+  Filter, ChevronDown, ChevronUp, DollarSign, Handshake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getVerificationAgencies, getActiveAgencyServices } from '@/lib/voc-services';
 import type { VerificationAgency, AgencyAvailability, SortOption, AgencyService } from '@/lib/voc-types';
+import { useAuth } from '@/components/providers/auth-provider';
+import { RequestMonitoringModal } from '@/components/shared/RequestMonitoringModal';
 
 const AVAILABILITY_CONFIG: Record<AgencyAvailability, { label: string; color: string; dot: string }> = {
   accepting: { label: 'Accepting Applications', color: 'text-emerald-700 bg-emerald-50', dot: 'bg-emerald-500' },
@@ -34,7 +36,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'alphabetical', label: 'Alphabetical' },
 ];
 
-function AgencyCard({ agency, services, onOpen }: { agency: VerificationAgency; services: AgencyService[]; onOpen: () => void }) {
+function AgencyCard({ agency, services, onOpen, isPartner, onRequestMonitoring }: { agency: VerificationAgency; services: AgencyService[]; onOpen: () => void; isPartner?: boolean; onRequestMonitoring?: () => void }) {
   const avail = AVAILABILITY_CONFIG[agency.availability];
   const currentYear = new Date().getFullYear();
   const activeServices = services.filter(s => s.is_active);
@@ -117,6 +119,15 @@ function AgencyCard({ agency, services, onOpen }: { agency: VerificationAgency; 
                 <Button variant="outline" size="sm" onClick={onOpen} className="gap-1.5 text-xs h-8">
                   View Organization <ArrowRight className="h-3 w-3" />
                 </Button>
+                {isPartner && onRequestMonitoring && (
+                  <Button
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onRequestMonitoring(); }}
+                    className="gap-1.5 text-xs h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                  >
+                    <Handshake className="h-3 w-3" /> Request Monitoring
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -128,8 +139,12 @@ function AgencyCard({ agency, services, onOpen }: { agency: VerificationAgency; 
 
 export default function VerificationAgenciesPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isPartner = profile?.role === 'sustainability_partner';
   const [allAgencies, setAllAgencies] = React.useState<VerificationAgency[]>([]);
   const [servicesMap, setServicesMap] = React.useState<Record<string, AgencyService[]>>({});
+  const [monitoringModalOpen, setMonitoringModalOpen] = React.useState(false);
+  const [selectedAgency, setSelectedAgency] = React.useState<{ id: string; name: string } | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -333,6 +348,11 @@ export default function VerificationAgenciesPage() {
             agency={agency}
             services={servicesMap[agency.id] || []}
             onOpen={() => router.push(`/dashboard/verification-agencies/${agency.id}`)}
+            isPartner={isPartner}
+            onRequestMonitoring={() => {
+              setSelectedAgency({ id: agency.profile_id, name: agency.name });
+              setMonitoringModalOpen(true);
+            }}
           />
         ))}
         {filtered.length === 0 && (
@@ -343,6 +363,15 @@ export default function VerificationAgenciesPage() {
           </div>
         )}
       </div>
+
+      {selectedAgency && (
+        <RequestMonitoringModal
+          verifierId={selectedAgency.id}
+          verifierName={selectedAgency.name}
+          isOpen={monitoringModalOpen}
+          onClose={() => { setMonitoringModalOpen(false); setSelectedAgency(null); }}
+        />
+      )}
     </div>
   );
 }

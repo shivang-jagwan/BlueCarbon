@@ -1,6 +1,7 @@
 'use server';
 
 import { getSupabaseServerClient } from '@/lib/supabase/server';
+import { notify } from '@/services/notify';
 import type { VerificationEvidence } from '@/lib/types';
 
 export async function createEvidenceRecord(data: {
@@ -93,8 +94,8 @@ export async function createEvidenceRecord(data: {
     .single();
 
   if (project?.owner_id && project.owner_id !== user.id) {
-    await supabase.from('notifications').insert({
-      user_id: project.owner_id,
+    await notify({
+      userId: project.owner_id,
       title: 'Evidence Uploaded',
       body: `New ${data.evidence_type.replace('_', ' ')} uploaded for "${project.name}"`,
       type: 'monitoring',
@@ -109,14 +110,15 @@ export async function createEvidenceRecord(data: {
     .eq('role', 'admin');
 
   if (admins && admins.length > 0) {
-    const adminNotifications = admins.map((admin: { id: string }) => ({
-      user_id: admin.id,
-      title: 'Evidence Uploaded',
-      body: `New ${data.evidence_type.replace('_', ' ')} uploaded for "${project?.name || 'project'}"`,
-      type: 'monitoring' as const,
-      link: `/admin/evidence`,
-    }));
-    await supabase.from('notifications').insert(adminNotifications);
+    for (const admin of admins) {
+      await notify({
+        userId: admin.id,
+        title: 'Evidence Uploaded',
+        body: `New ${data.evidence_type.replace('_', ' ')} uploaded for "${project?.name || 'project'}"`,
+        type: 'monitoring',
+        link: `/admin/evidence`,
+      });
+    }
   }
 
   return evidence;

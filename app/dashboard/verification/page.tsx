@@ -10,8 +10,6 @@ import {
   Eye,
   CalendarClock,
   CheckCircle2,
-  RotateCcw,
-  XCircle,
   ArrowRight,
   Clock,
   Shield,
@@ -23,23 +21,15 @@ import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
   type VerificationApplication,
-  type ApplicationStatus,
 } from '@/lib/voc-types';
 
-const KPI_CARDS = [
+import { PendingMonitoringRequests } from '@/components/verification/PendingMonitoringRequests';
+
+const ACTIVE_KPI_CARDS = [
   { label: 'Pending', icon: ClipboardCheck, color: 'text-blue-600', bg: 'bg-blue-50', status: 'submitted' as const },
   { label: 'Under Review', icon: Eye, color: 'text-indigo-600', bg: 'bg-indigo-50', status: 'under_review' as const },
   { label: 'Audit Scheduled', icon: CalendarClock, color: 'text-purple-600', bg: 'bg-purple-50', status: 'audit_scheduled' as const },
-  { label: 'Approved', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', status: 'approved' as const },
-  { label: 'Returned', icon: RotateCcw, color: 'text-amber-600', bg: 'bg-amber-50', status: 'returned_for_revision' as const },
-  { label: 'Rejected', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', status: 'rejected' as const },
-];
-
-const ACTIVE_STATUSES: ApplicationStatus[] = [
-  'submitted',
-  'under_review',
-  'audit_scheduled',
-  'audit_completed',
+  { label: 'Audit Completed', icon: FileText, color: 'text-cyan-600', bg: 'bg-cyan-50', status: 'audit_completed' as const },
 ];
 
 export default function VOCDashboardPage() {
@@ -69,24 +59,24 @@ export default function VOCDashboardPage() {
 
   const counts = React.useMemo(() => {
     const c: Record<string, number> = {};
-    KPI_CARDS.forEach((k) => {
+    ACTIVE_KPI_CARDS.forEach((k) => {
       c[k.status] = allApplications.filter(a => a.status === k.status).length;
     });
     return c;
   }, [allApplications]);
 
   const activeApplications = allApplications.filter((a) =>
-    ACTIVE_STATUSES.includes(a.status)
+    ['submitted', 'under_review', 'audit_scheduled', 'audit_completed'].includes(a.status)
   );
 
   const totalActive = activeApplications.length;
-  const totalCompleted = allApplications.filter((a) =>
+  const totalCompleted = allApplications.filter(a =>
     ['approved', 'returned_for_revision', 'rejected'].includes(a.status)
   ).length;
   const approvalRate =
     totalCompleted > 0
       ? Math.round(
-          (counts['approved'] / totalCompleted) * 100
+          (allApplications.filter(a => a.status === 'approved').length / totalCompleted) * 100
         )
       : 0;
 
@@ -109,8 +99,11 @@ export default function VOCDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        {KPI_CARDS.map((kpi) => {
+      <PendingMonitoringRequests />
+
+      {/* Active KPI Cards */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        {ACTIVE_KPI_CARDS.map((kpi) => {
           const Icon = kpi.icon;
           return (
             <Card

@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Bell, Send, Users, ShieldCheck, Briefcase, Globe, Clock, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
+import { sendNotification } from '@/lib/voc-services';
 
 export default function NotificationsPage() {
   const [loading, setLoading] = React.useState(false);
@@ -47,15 +48,14 @@ export default function NotificationsPage() {
       }
 
       // Insert notifications for each user
-      const notifications = users.map((u: { id: string }) => ({
-        user_id: u.id,
-        title,
-        body: message,
-        type: 'admin_broadcast',
-      }));
-
-      const { error: insertError } = await supabase.from('notifications').insert(notifications);
-      if (insertError) throw insertError;
+      for (const u of users) {
+        await sendNotification({
+          title,
+          body: message,
+          type: 'admin_broadcast',
+          targetUserId: u.id,
+        });
+      }
 
       setSentCount(users.length);
       toast.success(`Notification sent to ${users.length} user${users.length > 1 ? 's' : ''}`);

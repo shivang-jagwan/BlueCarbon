@@ -20,7 +20,6 @@ import {
   Search,
   MapPin,
   Ruler,
-  TrendingUp,
   Clock,
   Globe,
   HeartPulse,
@@ -402,10 +401,10 @@ export default function DiscoverPage() {
                   <div className="grid grid-cols-2 gap-y-4 gap-x-2 flex-1">
                     <div>
                       <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
-                        <TrendingUp className="h-3.5 w-3.5" /> Carbon Target
+                        <MapPin className="h-3.5 w-3.5" /> Project Type
                       </p>
                       <p className="text-sm font-medium">
-                        {project.target_carbon_tonnes ? `${project.target_carbon_tonnes.toLocaleString()} tCO₂e` : 'Pending'}
+                        {project.project_type || 'Pending'}
                       </p>
                     </div>
                     <div>

@@ -35,26 +35,29 @@ import {
   Brain,
   Satellite,
   BarChart3,
+  Leaf,
+  Globe,
+  ChevronDown,
 } from 'lucide-react';
 
 const fadeUp = {
-  initial: { opacity: 0, y: 24 },
+  initial: { opacity: 0, y: 30 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: '-60px' },
-  transition: { duration: 0.5, ease: [0.25, 0.4, 0.25, 1] as const },
+  viewport: { once: true, margin: '-80px' },
+  transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] as const },
 };
 
 const stagger = {
   initial: { opacity: 0 },
   whileInView: { opacity: 1 },
   viewport: { once: true, margin: '-60px' },
-  transition: { staggerChildren: 0.08 },
+  transition: { staggerChildren: 0.1 },
 };
 
 const staggerItem = {
-  initial: { opacity: 0, y: 16 },
+  initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
-  transition: { duration: 0.45, ease: [0.25, 0.4, 0.25, 1] as const },
+  transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
 };
 
 function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
@@ -65,11 +68,12 @@ function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
   React.useEffect(() => {
     if (!inView) return;
     let start = 0;
-    const duration = 1600;
+    const duration = 2000;
     const step = (timestamp: number) => {
       if (!start) start = timestamp;
       const progress = Math.min((timestamp - start) / duration, 1);
-      setCount(Math.floor(progress * target));
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * target));
       if (progress < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
@@ -122,19 +126,19 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      {/* ─── NAVIGATION ─── */}
+      {/* ─── FLOATING NAVIGATION ─── */}
       <nav
-        className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+        className={`fixed top-0 z-50 w-full transition-all duration-500 ${
           scrolled
-            ? 'bg-white/80 backdrop-blur-xl border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
-            : 'bg-transparent border-transparent'
-        } border-b`}
+            ? 'glass-strong shadow-soft-lg'
+            : 'bg-transparent'
+        }`}
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-10">
               <Link href="/" className="flex items-center">
-                <Logo />
+                <Logo iconClassName="h-10 w-auto" />
               </Link>
 
               <div className="hidden lg:flex items-center gap-1">
@@ -142,7 +146,11 @@ export default function LandingPage() {
                   <a
                     key={link.label}
                     href={link.href}
-                    className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-border/50"
+                    className={`px-3 py-2 text-sm font-medium transition-colors rounded-lg ${
+                      scrolled
+                        ? 'text-muted-foreground hover:text-foreground hover:bg-accent/10'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
                   >
                     {link.label}
                   </a>
@@ -151,41 +159,45 @@ export default function LandingPage() {
             </div>
 
             <div className="hidden lg:flex items-center gap-3">
-              <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" asChild className={`text-sm font-medium ${scrolled ? 'text-muted-foreground hover:text-foreground' : 'text-white/80 hover:text-white hover:bg-white/10'}`}>
                 <Link href="/login">Login</Link>
               </Button>
-              <Button asChild className="bg-primary hover:bg-primary/90 text-white rounded-lg px-5 h-9 text-sm font-medium shadow-sm">
+              <Button asChild className={`rounded-xl px-5 h-10 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 ${
+                scrolled
+                  ? 'bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20'
+                  : 'bg-white text-primary hover:bg-white/90 shadow-lg shadow-black/10'
+              }`}>
                 <Link href="/register">Get Started</Link>
               </Button>
             </div>
 
             <button
-              className="lg:hidden p-2 rounded-lg hover:bg-border/60 transition-colors"
+              className={`lg:hidden p-2 rounded-lg transition-colors ${scrolled ? 'hover:bg-accent/10' : 'hover:bg-white/10 text-white'}`}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Toggle menu"
             >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {mobileMenuOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
 
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-border bg-white px-4 py-4 space-y-1">
+          <div className="lg:hidden border-t border-white/10 glass-strong px-4 py-4 space-y-1">
             {navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="block px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
+                className="block px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-lg transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}
               </a>
             ))}
             <div className="pt-3 mt-2 border-t border-border flex flex-col gap-2">
-              <Button variant="outline" className="w-full rounded-lg border-border" asChild>
+              <Button variant="outline" className="w-full rounded-xl border-border" asChild>
                 <Link href="/login">Login</Link>
               </Button>
-              <Button className="w-full rounded-lg bg-primary hover:bg-primary/90 text-white" asChild>
+              <Button className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20" asChild>
                 <Link href="/register">Get Started</Link>
               </Button>
             </div>
@@ -194,51 +206,61 @@ export default function LandingPage() {
       </nav>
 
       <main>
-        {/* ─── 1. HERO ─── */}
-        <section className="relative overflow-hidden bg-white">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4" />
+        {/* ─── 1. HERO — Immersive Full-Screen ─── */}
+        <section className="relative min-h-screen flex items-center overflow-hidden">
+          {/* Background Image with Dark Overlay */}
+          <div className="absolute inset-0">
+            <Image
+              src={heroImage}
+              alt="Coastal Restoration"
+              fill
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 gradient-forest-hero" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
+          </div>
 
-          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-24 lg:pt-24 lg:pb-32">
+          {/* Animated Orbs */}
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-soft" />
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/15 rounded-full blur-[100px] animate-pulse-soft" style={{ animationDelay: '2s' }} />
+
+          <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-16 w-full">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.25, 0.4, 0.25, 1] as const }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as const }}
               >
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/8 border border-primary/15 text-primary text-xs font-medium mb-6">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-medium mb-8">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                   AI-Powered MRV Platform
                 </div>
 
-                <h1 className="font-display text-[2.75rem] sm:text-5xl lg:text-[3.5rem] font-bold tracking-tight leading-[1.08] text-gray-900 mb-6">
-                  Restore Blue Ecosystems.
+                <h1 className="font-display text-[2.5rem] sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight leading-[1.05] text-white mb-6">
+                  Empowering Nature.
                   <br />
-                  <span className="text-primary">Verify Impact.</span>
-                  <br />
-                  Inspire Change.
+                  <span className="text-gradient-forest-bright">Enabling Impact.</span>
                 </h1>
 
-                <p className="text-lg text-gray-600 leading-relaxed max-w-xl mb-8">
-                  CarbonRush AI connects Project Owners, Verification Organizations, and Sustainability Partners through a transparent Monitoring, Reporting & Verification platform for blue carbon ecosystems.
+                <p className="text-lg sm:text-xl text-white/70 leading-relaxed max-w-xl mb-10">
+                  The transparent MRV platform connecting Project Owners, Verification Organizations, and Sustainability Partners for blue carbon ecosystems.
                 </p>
 
-                <div className="flex flex-wrap items-center gap-3 mb-8">
-                  <Button asChild className="bg-primary hover:bg-primary/90 text-white rounded-xl px-6 h-11 text-sm font-medium shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-lg">
+                <div className="flex flex-wrap items-center gap-4 mb-10">
+                  <Button asChild className="bg-white text-primary hover:bg-white/90 rounded-xl px-7 h-12 text-sm font-semibold shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl">
                     <Link href="/dashboard/discover">
-                      Explore Projects <ArrowRight className="ml-2 h-4 w-4" />
+                      Explore Platform <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="rounded-xl px-6 h-11 text-sm font-medium bg-white border-primary text-primary hover:bg-primary hover:text-white transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-lg">
+                  <Button asChild variant="outline" className="rounded-xl px-7 h-12 text-sm font-medium border-white/25 text-white hover:bg-white/10 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5">
                     <Link href="/register">
-                      Request Demo
+                      Watch Demo <Play className="ml-2 h-4 w-4" />
                     </Link>
-                  </Button>
-                  <Button variant="ghost" className="rounded-xl px-4 h-11 text-sm font-medium text-gray-600 hover:text-primary transition-colors">
-                    <Play className="mr-2 h-4 w-4" /> Watch Tour
                   </Button>
                 </div>
 
-                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                <div className="flex flex-wrap gap-5 text-xs text-white/50">
                   {[
                     { icon: Brain, label: 'AI Powered' },
                     { icon: Map, label: 'GIS Mapping' },
@@ -246,71 +268,89 @@ export default function LandingPage() {
                     { icon: Shield, label: 'Verified MRV' },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center gap-1.5">
-                      <item.icon className="h-3.5 w-3.5 text-primary" />
+                      <item.icon className="h-3.5 w-3.5 text-emerald-400" />
                       <span>{item.label}</span>
                     </div>
                   ))}
                 </div>
               </motion.div>
 
+              {/* Hero KPI Cards */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.4, 0.25, 1] as const }}
-                className="relative"
+                transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] as const }}
+                className="relative hidden lg:block"
               >
-                <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-primary/8 border border-border">
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/20 border border-white/10">
                   <div className="aspect-[4/3] bg-gradient-to-br from-primary/80 via-primary to-primary/90 relative overflow-hidden">
                     <Image
                       src={heroImage}
                       alt="Coastal Restoration Zone"
                       fill
-                      className="object-cover"
+                      className="object-cover opacity-80"
                       placeholder="blur"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center text-white/90">
-                        <TreePine className="h-16 w-16 mx-auto mb-3 text-white/80" />
-                        <p className="text-sm font-medium text-white shadow-sm">Coastal Restoration Zone</p>
+                        <TreePine className="h-20 w-20 mx-auto mb-3 text-white/60" />
+                        <p className="text-sm font-medium text-white/80">Coastal Restoration Zone</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Floating KPI Cards */}
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 }}
-                  className="absolute -bottom-6 -left-4 right-8 sm:right-auto sm:w-72 bg-white/95 backdrop-blur-xl rounded-xl border border-border shadow-lg shadow-black/5 p-4"
+                  transition={{ duration: 0.6, delay: 0.6 }}
+                  className="absolute -bottom-8 -left-4 right-8 sm:right-auto sm:w-80 glass-strong rounded-2xl border border-white/15 p-5 shadow-2xl"
                 >
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     {[
-                      { value: '128+', label: 'Active Projects', color: 'text-primary' },
-                      { value: '45K+', label: 'CO₂ Verified (t)', color: 'text-accent' },
-                      { value: '12K+', label: 'Hectares Restored', color: 'text-primary' },
-                      { value: '56+', label: 'Verification Orgs', color: 'text-accent' },
+                      { value: '128+', label: 'Active Projects', color: 'text-emerald-400' },
+                      { value: '45K+', label: 'CO₂ Verified (t)', color: 'text-emerald-300' },
+                      { value: '12K+', label: 'Hectares Restored', color: 'text-emerald-400' },
+                      { value: '56+', label: 'Verification Orgs', color: 'text-emerald-300' },
                     ].map((stat) => (
                       <div key={stat.label} className="text-center">
-                        <p className={`text-lg font-bold font-display ${stat.color}`}>{stat.value}</p>
-                        <p className="text-[10px] text-muted-foreground leading-tight">{stat.label}</p>
+                        <p className={`text-xl font-bold font-display ${stat.color}`}>{stat.value}</p>
+                        <p className="text-[10px] text-white/50 leading-tight mt-0.5">{stat.label}</p>
                       </div>
                     ))}
                   </div>
                 </motion.div>
               </motion.div>
             </div>
+
+            {/* Scroll Indicator */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.5 }}
+              className="absolute bottom-8 left-1/2 -translate-x-1/2"
+            >
+              <motion.div
+                animate={{ y: [0, 8, 0] }}
+                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+              >
+                <ChevronDown className="h-6 w-6 text-white/40" />
+              </motion.div>
+            </motion.div>
           </div>
         </section>
 
         {/* ─── 2. TRUSTED BY ─── */}
-        <section className="py-14 border-y border-border bg-white">
+        <section className="py-16 border-y border-border/50 bg-background">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-8">
+            <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-10">
               Trusted by organizations driving restoration
             </p>
-            <div className="flex flex-wrap justify-center items-center gap-x-10 gap-y-5">
+            <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-6">
               {['Universities', 'NGOs', 'CSR Companies', 'Government Agencies', 'Research Institutions'].map((name) => (
-                <div key={name} className="flex items-center gap-2 font-semibold text-sm text-muted-foreground/60 select-none">
+                <div key={name} className="flex items-center gap-2.5 font-semibold text-sm text-muted-foreground/50 select-none hover:text-muted-foreground transition-colors">
                   <Building2 className="h-4 w-4" /> {name}
                 </div>
               ))}
@@ -319,14 +359,14 @@ export default function LandingPage() {
         </section>
 
         {/* ─── 3. PLATFORM OVERVIEW (3 Roles) ─── */}
-        <section id="platform" className="py-28 bg-white">
+        <section id="platform" className="py-28 bg-background">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Platform</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                 Built for every stakeholder
               </h2>
-              <p className="text-gray-600 text-lg">
+              <p className="text-muted-foreground text-lg">
                 A unified ecosystem connecting project developers, auditors, and sustainability partners.
               </p>
             </motion.div>
@@ -353,14 +393,14 @@ export default function LandingPage() {
                 },
               ].map((role) => (
                 <motion.div key={role.title} variants={staggerItem}>
-                  <Card className="border-gray-200 bg-white group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-xl hover:bg-primary hover:border-primary h-full">
+                  <Card className="border-border/50 bg-card group cursor-pointer transition-all duration-500 ease-out hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 hover:border-primary/30 h-full">
                     <CardContent className="p-7">
-                      <div className="w-12 h-12 rounded-xl bg-primary/8 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center mb-5">
-                        <role.icon className="h-6 w-6 text-primary group-hover:text-white transition-colors duration-300" />
+                      <div className="w-12 h-12 rounded-xl bg-primary/8 group-hover:bg-primary/15 transition-colors duration-500 flex items-center justify-center mb-5">
+                        <role.icon className="h-6 w-6 text-primary group-hover:scale-110 transition-transform duration-500" />
                       </div>
-                      <h3 className="font-display text-lg font-semibold text-gray-900 group-hover:text-white transition-colors duration-300 mb-2">{role.title}</h3>
-                      <p className="text-sm text-gray-500 group-hover:text-white/85 transition-colors duration-300 leading-relaxed mb-5">{role.desc}</p>
-                      <a href="/register" className="inline-flex items-center text-sm font-medium text-primary group-hover:text-white transition-colors">
+                      <h3 className="font-display text-lg font-semibold mb-2">{role.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-5">{role.desc}</p>
+                      <a href="/register" className="inline-flex items-center text-sm font-medium text-primary group-hover:text-primary/80 transition-colors">
                         {role.cta} <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                       </a>
                     </CardContent>
@@ -372,30 +412,30 @@ export default function LandingPage() {
         </section>
 
         {/* ─── 4. HOW CARBONRUSH WORKS (Horizontal Timeline) ─── */}
-        <section id="how-it-works" className="py-28 bg-[#F8FBF8]">
+        <section id="how-it-works" className="py-28 bg-muted/30">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-16">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">How it Works</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                 From registration to verified impact
               </h2>
-              <p className="text-gray-600 text-lg">
+              <p className="text-muted-foreground text-lg">
                 A seamless journey powering transparent blue carbon restoration.
               </p>
             </motion.div>
 
             {/* Desktop: Horizontal Timeline */}
             <motion.div {...fadeUp} className="hidden md:block relative max-w-5xl mx-auto">
-              <div className="absolute top-6 left-[8%] right-[8%] h-px bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20" />
+              <div className="absolute top-6 left-[8%] right-[8%] h-px bg-gradient-to-r from-primary/10 via-primary/25 to-primary/10" />
               <div className="grid grid-cols-6 gap-4">
                 {workflowSteps.map((step, i) => (
                   <div key={i} className="flex flex-col items-center text-center relative z-10">
-                    <div className="w-12 h-12 rounded-full bg-white border-2 border-primary/20 flex items-center justify-center mb-4 shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-background border-2 border-primary/20 flex items-center justify-center mb-4 shadow-soft">
                       <step.icon className="h-5 w-5 text-primary" />
                     </div>
                     <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step {i + 1}</p>
-                    <p className="text-sm font-semibold text-gray-900 mb-1">{step.title}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">{step.desc}</p>
+                    <p className="text-sm font-semibold mb-1">{step.title}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{step.desc}</p>
                   </div>
                 ))}
               </div>
@@ -406,12 +446,12 @@ export default function LandingPage() {
               <div className="absolute top-0 bottom-0 left-4 w-px bg-primary/20" />
               {workflowSteps.map((step, i) => (
                 <motion.div key={i} variants={staggerItem} className="relative">
-                  <div className="absolute -left-10 top-0 w-8 h-8 rounded-full bg-white border-2 border-primary/20 flex items-center justify-center shadow-sm">
+                  <div className="absolute -left-10 top-0 w-8 h-8 rounded-full bg-background border-2 border-primary/20 flex items-center justify-center shadow-soft">
                     <step.icon className="h-4 w-4 text-primary" />
                   </div>
                   <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step {i + 1}</p>
-                  <p className="text-sm font-semibold text-gray-900 mb-1">{step.title}</p>
-                  <p className="text-xs text-gray-500">{step.desc}</p>
+                  <p className="text-sm font-semibold mb-1">{step.title}</p>
+                  <p className="text-xs text-muted-foreground">{step.desc}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -419,14 +459,14 @@ export default function LandingPage() {
         </section>
 
         {/* ─── 5. DASHBOARD PREVIEW ─── */}
-        <section id="features" className="py-28 bg-white">
+        <section id="features" className="py-28 bg-background">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto mb-12">
               <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Preview</Badge>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                 See the platform in action
               </h2>
-              <p className="text-gray-600 text-lg">
+              <p className="text-muted-foreground text-lg">
                 Explore each dashboard and discover how CarbonRush AI works for every role.
               </p>
             </motion.div>
@@ -434,14 +474,14 @@ export default function LandingPage() {
             <motion.div {...fadeUp}>
               <Tabs value={previewTab} onValueChange={setPreviewTab} className="w-full">
                 <div className="flex justify-center mb-8">
-                  <TabsList className="bg-background border border-border p-1 rounded-xl h-auto">
+                  <TabsList className="bg-muted/50 border border-border/50 p-1 rounded-xl h-auto">
                     {[
                       { value: 'owner', label: 'Project Owner' },
                       { value: 'verifier', label: 'Verifier' },
                       { value: 'partner', label: 'Sustainability Partner' },
                       { value: 'admin', label: 'Admin' },
                     ].map((tab) => (
-                      <TabsTrigger key={tab.value} value={tab.value} className="rounded-lg px-4 py-2 text-xs font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-foreground">
+                      <TabsTrigger key={tab.value} value={tab.value} className="rounded-lg px-4 py-2 text-xs font-medium data-[state=active]:bg-background data-[state=active]:shadow-soft data-[state=active]:text-foreground">
                         {tab.label}
                       </TabsTrigger>
                     ))}
@@ -449,49 +489,49 @@ export default function LandingPage() {
                 </div>
 
                 {[
-                  { value: 'owner', color: '#2E7D32', title: 'Project Owner Dashboard', desc: 'Manage projects, upload monitoring evidence, track health scores, and coordinate with verifiers.' },
-                  { value: 'verifier', color: '#43A047', title: 'Verification Dashboard', desc: 'Review service requests, examine evidence, leave comments, and issue approvals.' },
-                  { value: 'partner', color: '#2E7D32', title: 'Sustainability Partner Hub', desc: 'Discover projects, establish partnerships, monitor impact, and download ESG reports.' },
-                  { value: 'admin', color: '#43A047', title: 'Admin Console', desc: 'Platform health monitoring, user management, verification queues, and activity logs.' },
+                  { value: 'owner', color: '#152 60% 28%', title: 'Project Owner Dashboard', desc: 'Manage projects, upload monitoring evidence, track health scores, and coordinate with verifiers.' },
+                  { value: 'verifier', color: '#152 55% 36%', title: 'Verification Dashboard', desc: 'Review service requests, examine evidence, leave comments, and issue approvals.' },
+                  { value: 'partner', color: '#142 55% 32%', title: 'Sustainability Partner Hub', desc: 'Discover projects, establish partnerships, monitor impact, and download ESG reports.' },
+                  { value: 'admin', color: '#152 60% 30%', title: 'Admin Console', desc: 'Platform health monitoring, user management, verification queues, and activity logs.' },
                 ].map((panel) => (
                   <TabsContent key={panel.value} value={panel.value} className="mt-0">
                     <div className="relative max-w-4xl mx-auto">
-                      <div className="rounded-2xl border border-border bg-white shadow-2xl shadow-black/5 overflow-hidden">
-                        <div className="h-9 bg-background border-b border-border flex items-center px-4 gap-2">
+                      <div className="rounded-2xl border border-border/50 bg-card shadow-2xl shadow-black/5 overflow-hidden">
+                        <div className="h-9 bg-muted/50 border-b border-border/50 flex items-center px-4 gap-2">
                           <div className="flex gap-1.5">
                             <div className="w-2.5 h-2.5 rounded-full bg-border" />
                             <div className="w-2.5 h-2.5 rounded-full bg-border" />
                             <div className="w-2.5 h-2.5 rounded-full bg-border" />
                           </div>
                           <div className="flex-1 flex justify-center">
-                            <div className="px-3 py-0.5 rounded-md bg-white text-[10px] text-muted-foreground/60 font-medium border border-border">
+                            <div className="px-3 py-0.5 rounded-md bg-background text-[10px] text-muted-foreground/60 font-medium border border-border/50">
                               carbonrush.ai/dashboard
                             </div>
                           </div>
                         </div>
-                        <div className="p-6 sm:p-8 bg-gradient-to-br from-background to-white">
+                        <div className="p-6 sm:p-8 bg-gradient-to-br from-background to-card">
                           <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${panel.color}10` }}>
-                              <div className="w-5 h-5 rounded-md" style={{ backgroundColor: panel.color }} />
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                              <div className="w-5 h-5 rounded-md bg-primary" />
                             </div>
                             <div>
-                              <h3 className="font-display text-sm font-semibold text-gray-900">{panel.title}</h3>
-                              <p className="text-xs text-gray-500">{panel.desc}</p>
+                              <h3 className="font-display text-sm font-semibold">{panel.title}</h3>
+                              <p className="text-xs text-muted-foreground">{panel.desc}</p>
                             </div>
                           </div>
                           <div className="grid grid-cols-3 gap-3 mb-4">
                             {[1, 2, 3].map((i) => (
-                              <div key={i} className="h-20 rounded-lg bg-white border border-border p-3">
-                                <div className="h-2 w-16 bg-border rounded-full mb-2" />
-                                <div className="h-4 w-10 bg-primary/10 rounded-full" />
+                              <div key={i} className="h-20 rounded-xl bg-background border border-border/50 p-3 shadow-soft">
+                                <div className="h-2 w-16 bg-border/60 rounded-full mb-2" />
+                                <div className="h-4 w-10 bg-primary/15 rounded-full" />
                               </div>
                             ))}
                           </div>
-                          <div className="h-32 rounded-lg bg-white border border-border p-4">
-                            <div className="h-2 w-24 bg-border rounded-full mb-3" />
+                          <div className="h-32 rounded-xl bg-background border border-border/50 p-4 shadow-soft">
+                            <div className="h-2 w-24 bg-border/60 rounded-full mb-3" />
                             <div className="space-y-2">
                               {[1, 2, 3].map((i) => (
-                                <div key={i} className="h-2 rounded-full bg-border" style={{ width: `${80 - i * 15}%` }} />
+                                <div key={i} className="h-2 rounded-full bg-border/40" style={{ width: `${80 - i * 15}%` }} />
                               ))}
                             </div>
                           </div>
@@ -507,12 +547,12 @@ export default function LandingPage() {
             <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{ once: true }} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-16">
               {features.map((feature) => (
                 <motion.div key={feature.title} variants={staggerItem}>
-                  <div className="border border-gray-200 bg-white rounded-xl p-5 group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-xl hover:bg-primary hover:border-primary h-full">
-                    <div className="w-10 h-10 rounded-lg bg-primary/6 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center mb-3">
-                      <feature.icon className="h-5 w-5 text-primary group-hover:text-white transition-colors duration-300" />
+                  <div className="border border-border/50 bg-card rounded-xl p-5 group cursor-pointer transition-all duration-500 ease-out hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/10 hover:border-primary/30 h-full">
+                    <div className="w-10 h-10 rounded-lg bg-primary/8 group-hover:bg-primary/15 transition-colors duration-500 flex items-center justify-center mb-3">
+                      <feature.icon className="h-5 w-5 text-primary group-hover:scale-110 transition-transform duration-500" />
                     </div>
-                    <h3 className="font-display text-sm font-semibold text-gray-900 group-hover:text-white transition-colors duration-300 mb-1">{feature.title}</h3>
-                    <p className="text-xs text-gray-500 group-hover:text-white/85 transition-colors duration-300 leading-relaxed">{feature.desc}</p>
+                    <h3 className="font-display text-sm font-semibold mb-1">{feature.title}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{feature.desc}</p>
                   </div>
                 </motion.div>
               ))}
@@ -521,11 +561,11 @@ export default function LandingPage() {
         </section>
 
         {/* ─── 6. GIS MONITORING ─── */}
-        <section className="py-28 bg-[#F8FBF8]">
+        <section id="why" className="py-28 bg-muted/30">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <motion.div {...fadeUp} className="order-2 lg:order-1 relative">
-                <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-foreground/90">
+                <div className="rounded-2xl border border-border/50 shadow-2xl overflow-hidden bg-card">
                   <div className="aspect-[4/3] relative">
                     <Image
                       src={mapImage}
@@ -534,12 +574,12 @@ export default function LandingPage() {
                       className="object-cover"
                       placeholder="blur"
                     />
-                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md rounded-lg px-3 py-2 text-white text-xs font-medium flex items-center gap-2 border border-white/10 shadow-lg">
-                      <MapPin className="h-3.5 w-3.5" /> Sundarbans Project Zone
+                    <div className="absolute top-4 left-4 glass-strong rounded-lg px-3 py-2 text-foreground text-xs font-medium flex items-center gap-2 shadow-lg">
+                      <MapPin className="h-3.5 w-3.5 text-primary" /> Sundarbans Project Zone
                     </div>
-                    <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-md rounded-lg px-3 py-2 text-white text-xs border border-white/10 shadow-lg">
-                      <div className="flex items-center gap-1.5 mb-1"><div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" /> Healthy: 78%</div>
-                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]" /> Monitoring: 22%</div>
+                    <div className="absolute bottom-4 right-4 glass-strong rounded-lg px-3 py-2 text-xs shadow-lg">
+                      <div className="flex items-center gap-1.5 mb-1"><div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" /> Healthy: 78%</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" /> Monitoring: 22%</div>
                     </div>
                   </div>
                 </div>
@@ -547,10 +587,10 @@ export default function LandingPage() {
 
               <motion.div {...fadeUp} className="order-1 lg:order-2">
                 <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Maps & Monitoring</Badge>
-                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
+                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                   See restoration in real time
                 </h2>
-                <p className="text-gray-600 text-lg leading-relaxed mb-8">
+                <p className="text-muted-foreground text-lg leading-relaxed mb-8">
                   Interactive GIS maps with satellite overlays and continuous health monitoring.
                 </p>
                 <div className="space-y-4">
@@ -560,13 +600,13 @@ export default function LandingPage() {
                     { icon: Calendar, title: 'Monitoring Timeline', desc: 'Monthly evidence uploads and progress tracking.' },
                     { icon: FileText, title: 'Automated Reports', desc: 'Compliance-ready PDFs generated from monitoring data.' },
                   ].map((item) => (
-                    <div key={item.title} className="flex items-start gap-3 p-3 -mx-3 rounded-xl group cursor-pointer transition-all duration-300 ease-out hover:bg-primary hover:-translate-y-1 hover:shadow-md">
-                      <div className="w-8 h-8 rounded-lg bg-primary/8 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <item.icon className="h-4 w-4 text-primary group-hover:text-white transition-colors duration-300" />
+                    <div key={item.title} className="flex items-start gap-3 p-3 -mx-3 rounded-xl group cursor-pointer transition-all duration-300 ease-out hover:bg-primary/5 hover:-translate-y-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-primary/8 group-hover:bg-primary/15 transition-colors duration-300 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-white transition-colors duration-300">{item.title}</p>
-                        <p className="text-xs text-gray-500 group-hover:text-white/85 transition-colors duration-300">{item.desc}</p>
+                        <p className="text-sm font-semibold">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -577,15 +617,15 @@ export default function LandingPage() {
         </section>
 
         {/* ─── 7. CARBON PASSPORT ─── */}
-        <section className="py-28 bg-white">
+        <section className="py-28 bg-background">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <motion.div {...fadeUp}>
                 <Badge variant="outline" className="border-primary/20 text-primary mb-4 text-xs font-medium">Carbon Passport</Badge>
-                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-gray-800 mb-4">
+                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                   Immutable proof of impact
                 </h2>
-                <p className="text-gray-600 text-lg leading-relaxed mb-8">
+                <p className="text-muted-foreground text-lg leading-relaxed mb-8">
                   Every verified ton of carbon sequestered receives a tamper-proof digital passport — transparent, auditable, and globally recognized.
                 </p>
                 <div className="grid grid-cols-2 gap-4">
@@ -595,13 +635,13 @@ export default function LandingPage() {
                     { icon: Eye, title: 'Transparent', desc: 'Publicly verifiable on the platform' },
                     { icon: Award, title: 'Globally Trusted', desc: 'Recognized by global standards' },
                   ].map((item) => (
-                    <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-gray-200 group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] hover:shadow-xl hover:bg-primary hover:border-primary">
-                      <div className="w-9 h-9 rounded-lg bg-primary/8 group-hover:bg-white/20 transition-colors duration-300 flex items-center justify-center flex-shrink-0">
-                        <item.icon className="h-4 w-4 text-primary group-hover:text-white transition-colors duration-300" />
+                    <div key={item.title} className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border/50 group cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
+                      <div className="w-9 h-9 rounded-lg bg-primary/8 group-hover:bg-primary/15 transition-colors duration-300 flex items-center justify-center flex-shrink-0">
+                        <item.icon className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-white transition-colors duration-300">{item.title}</p>
-                        <p className="text-xs text-gray-500 group-hover:text-white/85 transition-colors duration-300">{item.desc}</p>
+                        <p className="text-sm font-semibold">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -609,12 +649,12 @@ export default function LandingPage() {
               </motion.div>
 
               <motion.div {...fadeUp} className="relative flex justify-center">
-                <div className="w-72 rounded-2xl bg-white border border-border shadow-xl shadow-primary/8 p-6 relative">
-                  <div className="absolute -top-3 -right-3 bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+                <div className="w-72 rounded-2xl bg-card border border-border/50 shadow-2xl shadow-primary/5 p-6 relative">
+                  <div className="absolute -top-3 -right-3 bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-primary/30">
                     VERIFIED
                   </div>
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20">
                       <Fingerprint className="h-5 w-5 text-white" />
                     </div>
                     <div>
@@ -629,11 +669,11 @@ export default function LandingPage() {
                     <div className="flex justify-between"><span className="text-muted-foreground">Issue Date</span><span className="font-medium">Jan 2026</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Valid Until</span><span className="font-medium">Jan 2031</span></div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-border">
-                    <div className="h-12 bg-background rounded-lg flex items-center justify-center">
+                  <div className="mt-4 pt-3 border-t border-border/50">
+                    <div className="h-12 bg-muted/30 rounded-lg flex items-center justify-center">
                       <div className="flex gap-px">
                         {Array.from({ length: 20 }).map((_, i) => (
-                          <div key={i} className="w-1 bg-foreground" style={{ height: `${12 + Math.sin(i * 0.8) * 8}px` }} />
+                          <div key={i} className="w-1 bg-foreground/60" style={{ height: `${12 + Math.sin(i * 0.8) * 8}px` }} />
                         ))}
                       </div>
                     </div>
@@ -645,11 +685,35 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── 8. FINAL CTA ─── */}
-        <section id="contact" className="py-28 bg-white">
+        {/* ─── 8. IMPACT NUMBERS ─── */}
+        <section className="py-20 bg-muted/30 border-y border-border/50">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <motion.div {...fadeUp}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                {[
+                  { value: 128, suffix: '+', label: 'Active Projects', icon: TreePine },
+                  { value: 45000, suffix: '+', label: 'Tonnes CO₂ Verified', icon: Leaf },
+                  { value: 12000, suffix: '+', label: 'Hectares Monitored', icon: Globe },
+                  { value: 56, suffix: '+', label: 'Countries', icon: Users },
+                ].map((stat) => (
+                  <div key={stat.label} className="flex flex-col items-center">
+                    <stat.icon className="h-5 w-5 text-primary/40 mb-3" />
+                    <p className="font-display text-3xl sm:text-4xl font-bold text-gradient-forest mb-1">
+                      <CountUp target={stat.value} suffix={stat.suffix} />
+                    </p>
+                    <p className="text-xs text-muted-foreground font-medium">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ─── 9. FINAL CTA ─── */}
+        <section id="contact" className="py-28 bg-background">
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeUp}>
-              <div className="rounded-3xl bg-gradient-to-br from-primary to-primary/80 p-12 sm:p-16 text-center text-white relative overflow-hidden">
+              <div className="rounded-3xl gradient-forest p-12 sm:p-16 text-center text-white relative overflow-hidden">
                 <div className="absolute inset-0 opacity-10">
                   <svg viewBox="0 0 800 400" className="w-full h-full">
                     <circle cx="100" cy="100" r="200" fill="white" opacity="0.05" />
@@ -664,7 +728,7 @@ export default function LandingPage() {
                     Join the transparent MRV platform trusted by project developers, verifiers, and sustainability partners worldwide.
                   </p>
                   <div className="flex flex-col sm:flex-row justify-center gap-3">
-                    <Button asChild className="bg-white text-primary hover:bg-white/90 rounded-xl px-8 h-12 text-sm font-semibold shadow-lg shadow-black/10">
+                    <Button asChild className="bg-white text-primary hover:bg-white/90 rounded-xl px-8 h-12 text-sm font-semibold shadow-xl shadow-black/20">
                       <Link href="/register">
                         Get Started <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -682,20 +746,20 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* ─── 9. FOOTER ─── */}
-      <footer className="bg-white text-gray-600 border-t border-gray-200 pt-16 pb-8">
+      {/* ─── 10. FOOTER ─── */}
+      <footer className="bg-foreground text-muted-foreground border-t border-border/50 pt-16 pb-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
             <div className="col-span-2">
               <Link href="/" className="inline-block mb-4">
-                <Logo />
+                <Logo iconClassName="h-10 w-auto [&_img]:brightness-0 [&_img]:invert" />
               </Link>
-              <p className="text-sm leading-relaxed max-w-xs mb-4">
+              <p className="text-sm leading-relaxed max-w-xs mb-4 text-muted-foreground">
                 The transparent MRV platform for blue carbon restoration projects.
               </p>
               <div className="flex gap-3 text-xs">
                 {['Twitter', 'LinkedIn', 'GitHub'].map((s) => (
-                  <span key={s} className="hover:text-gray-900 transition-colors cursor-pointer">{s}</span>
+                  <span key={s} className="hover:text-foreground transition-colors cursor-pointer">{s}</span>
                 ))}
               </div>
             </div>
@@ -719,11 +783,11 @@ export default function LandingPage() {
               },
             ].map((col) => (
               <div key={col.title}>
-                <h4 className="text-sm font-semibold text-gray-900 mb-4">{col.title}</h4>
+                <h4 className="text-sm font-semibold mb-4">{col.title}</h4>
                 <ul className="space-y-2.5">
                   {col.links.map((link) => (
                     <li key={link}>
-                      <a href="#" className="text-sm hover:text-gray-900 transition-colors">{link}</a>
+                      <a href="#" className="text-sm hover:text-foreground transition-colors">{link}</a>
                     </li>
                   ))}
                 </ul>
@@ -731,12 +795,12 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+          <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground">
             <p suppressHydrationWarning>&copy; {new Date().getFullYear()} CarbonRush AI. All rights reserved.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-gray-900 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-gray-900 transition-colors">Terms</a>
-              <a href="#" className="hover:text-gray-900 transition-colors">Cookies</a>
+              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
+              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+              <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
             </div>
           </div>
         </div>

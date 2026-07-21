@@ -11,7 +11,7 @@ import {
   ArrowLeft, ShieldCheck, Building2, MapPin, Globe, Clock,
   CheckCircle2, Briefcase, Users, CalendarClock, Award,
   FileText, Map, Check, AlertCircle, ChevronRight,
-  Edit, ExternalLink, Mail, Phone, DollarSign,
+  Edit, ExternalLink, Mail, Phone, DollarSign, Handshake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -20,6 +20,7 @@ import {
 } from '@/lib/voc-services';
 import type { VerificationAgency, AgencyService } from '@/lib/voc-types';
 import { AGENCY_SERVICE_CATEGORY_LABELS } from '@/lib/voc-types';
+import { RequestMonitoringModal } from '@/components/shared/RequestMonitoringModal';
 
 const AVAILABILITY_CONFIG = {
   accepting: { label: 'Accepting Applications', color: 'text-emerald-700 bg-emerald-50', dot: 'bg-emerald-500' },
@@ -30,14 +31,16 @@ const AVAILABILITY_CONFIG = {
 export default function OrganizationProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const agencyId = params.id as string;
   const [agency, setAgency] = React.useState<VerificationAgency | null>(null);
   const [services, setServices] = React.useState<AgencyService[]>([]);
   const [recentProjects, setRecentProjects] = React.useState<{ project_name: string; status: string; date: string }[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [monitoringModalOpen, setMonitoringModalOpen] = React.useState(false);
 
   const isOwner = agency && user && agency.profile_id === user.id;
+  const isPartner = profile?.role === 'sustainability_partner';
 
   React.useEffect(() => {
     let cancelled = false;
@@ -119,6 +122,15 @@ export default function OrganizationProfilePage() {
               {isOwner && (
                 <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 ml-2" onClick={() => router.push(`/dashboard/verification-agencies/${agencyId}/edit`)}>
                   <Edit className="h-3 w-3" /> Edit Profile
+                </Button>
+              )}
+              {isPartner && (
+                <Button
+                  size="sm"
+                  className="h-6 text-[10px] gap-1 ml-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => setMonitoringModalOpen(true)}
+                >
+                  <Handshake className="h-3 w-3" /> Request Monitoring Partnership
                 </Button>
               )}
             </div>
@@ -442,6 +454,15 @@ export default function OrganizationProfilePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {agency && isPartner && (
+        <RequestMonitoringModal
+          verifierId={agency.profile_id}
+          verifierName={agency.name}
+          isOpen={monitoringModalOpen}
+          onClose={() => setMonitoringModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

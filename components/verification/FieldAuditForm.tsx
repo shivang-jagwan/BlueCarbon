@@ -12,11 +12,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   MapPin, TreePine, Camera, FileText, CheckCircle2, Loader2,
   Send, AlertTriangle, Leaf, Eye, ClipboardCheck, TreeDeciduous,
-  Bug, Shield, FileWarning, AlertOctagon, Target, Activity,
+  Bug, Shield, FileWarning, AlertOctagon, Target, Activity, Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { submitAuditReport, completeAgencyAudit } from '@/lib/voc-services';
+import { GeospatialEvidenceSection } from './GeospatialEvidenceSection';
+import type { AuditMediaItem } from '@/lib/voc-types';
 
 interface FieldAuditFormProps {
   requestId: string;
@@ -389,19 +391,32 @@ export function FieldAuditForm({
         </div>
       </Section>
 
-      {/* 6. Audit Evidence */}
-      <Section icon={Camera} title="Audit Evidence" color="text-purple-600">
-        <div className="grid grid-cols-3 gap-4">
+      {/* 6. Geospatial Evidence Collection */}
+      <Section icon={Globe} title="Geospatial Evidence Collection" color="text-teal-600">
+        <p className="text-xs text-muted-foreground -mt-2 mb-2">
+          Upload geo-tagged photos, drone imagery, satellite captures, and capture GPS locations during the field audit.
+        </p>
+        <GeospatialEvidenceSection
+          projectId={projectId}
+          auditId={agencyRequestId}
+          verificationId={requestId}
+          auditorName={auditorName}
+          onMediaUploaded={(item) => {
+            if (item.media_type === 'photo') updateField('photosTaken', String(parseInt(formData.photosTaken || '0', 10) + 1));
+            if (item.media_type === 'drone_video') updateField('videosRecorded', String(parseInt(formData.videosRecorded || '0', 10) + 1));
+          }}
+        />
+        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
           <div className="space-y-2">
-            <Label className="text-sm">Photos Taken</Label>
+            <Label className="text-xs text-muted-foreground">Total Photos</Label>
             <Input type="number" min={0} placeholder="0" value={formData.photosTaken} onChange={e => updateField('photosTaken', e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label className="text-sm">Videos Recorded</Label>
+            <Label className="text-xs text-muted-foreground">Total Videos</Label>
             <Input type="number" min={0} placeholder="0" value={formData.videosRecorded} onChange={e => updateField('videosRecorded', e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label className="text-sm">Samples Collected</Label>
+            <Label className="text-xs text-muted-foreground">Samples Collected</Label>
             <Input type="number" min={0} placeholder="0" value={formData.samplesCollected} onChange={e => updateField('samplesCollected', e.target.value)} />
           </div>
         </div>

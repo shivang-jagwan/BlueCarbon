@@ -3,16 +3,16 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/shared/logo';
-import { getNavForRole, getRoleLabel } from '@/lib/navigation';
+import { getNavForRole } from '@/lib/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useSidebar } from '@/components/providers/sidebar-provider';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { Menu, LogOut, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Menu, ChevronRight, ChevronLeft, Sun, Moon, Monitor } from 'lucide-react';
 
 function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -75,42 +75,69 @@ function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: 
   );
 }
 
-function UserCard({ collapsed }: { collapsed: boolean }) {
-  const { profile, signOut } = useAuth();
-  if (!profile) return null;
+const themeOptions = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
+] as const;
 
-  const initials = (profile.full_name || profile.email)
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+function ThemeSelector({ collapsed }: { collapsed: boolean }) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-1 py-2">
+        {themeOptions.map((opt) => {
+          const Icon = opt.icon;
+          const isActive = theme === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setTheme(opt.value)}
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                isActive
+                  ? 'bg-sidebar-accent text-primary'
+                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+              )}
+              title={opt.label}
+              aria-label={`Theme: ${opt.label}`}
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
-    <div className="border-t border-sidebar-border p-3">
-      <div className={cn('flex items-center rounded-lg px-2 py-2', collapsed ? 'justify-center' : 'gap-3')}>
-        <Avatar className="h-9 w-9 border border-border">
-          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-        {!collapsed && (
-          <>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{profile.full_name || 'User'}</p>
-              <p className="truncate text-xs text-muted-foreground">{getRoleLabel(profile.role)}</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => signOut()}
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </>
-        )}
-      </div>
+    <div className="flex items-center gap-1 rounded-lg bg-sidebar-accent/50 p-1">
+      {themeOptions.map((opt) => {
+        const Icon = opt.icon;
+        const isActive = theme === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => setTheme(opt.value)}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+              isActive
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            aria-label={`Theme: ${opt.label}`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -152,7 +179,9 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto">
         <NavLinks collapsed={collapsed} />
       </div>
-      <UserCard collapsed={collapsed} />
+      <div className="border-t border-sidebar-border p-3">
+        <ThemeSelector collapsed={collapsed} />
+      </div>
     </aside>
   );
 }

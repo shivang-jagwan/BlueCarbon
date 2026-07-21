@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { sendNotification } from '@/lib/voc-services';
 import { useAuth } from '@/components/providers/auth-provider';
 import type { Project, ProjectActivity, ProjectFile, MonitoringReport, NotificationItem, VerificationServiceRequest, VerificationDecisionRecord, DiscussionComment } from '@/lib/types';
 
@@ -402,11 +403,11 @@ export async function issueCarbonPassport(projectId: string, verifierId: string,
     });
 
     // Notify Owner
-    await supabase.from('notifications').insert({
-      user_id: ownerId,
+    await sendNotification({
       title: 'Carbon Passport Issued!',
       body: 'Your project has officially received its Carbon Passport.',
       type: 'verification',
+      targetUserId: ownerId,
       link: `/dashboard/projects/${projectId}/passport`,
     });
 

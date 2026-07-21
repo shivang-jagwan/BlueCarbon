@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
+import { sendNotification } from '@/lib/voc-services';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -113,21 +114,21 @@ export function RequestVerificationModal({
 
       // 3. Send Notifications
       // Notification to Verifier
-      await supabase.from('notifications').insert({
-        user_id: verifierId,
+      await sendNotification({
         title: 'New verification request received.',
         body: `You have received a new ${requestType} verification request.`,
         type: 'verification',
-        link: '/dashboard/verification'
+        targetUserId: verifierId,
+        link: '/dashboard/verification',
       });
 
       // Notification to Project Owner
-      await supabase.from('notifications').insert({
-        user_id: user?.id,
+      await sendNotification({
         title: 'Verification request successfully submitted.',
         body: `Your request to ${verifierName} was successfully submitted.`,
         type: 'verification',
-        link: `/dashboard/projects/${projectId}/verification`
+        targetUserId: user?.id || '',
+        link: `/dashboard/projects/${projectId}/verification`,
       });
 
       toast.success('Verification request submitted successfully.');

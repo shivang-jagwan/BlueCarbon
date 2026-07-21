@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import { useProject, useMonitoringReports } from '@/hooks/use-projects';
+import { useAuth } from '@/components/providers/auth-provider';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,12 +28,14 @@ export default function ReportsPage() {
   const projectId = params.id as string;
   const { project } = useProject(projectId);
   const { reports } = useMonitoringReports(projectId);
+  const { profile } = useAuth();
+  const isPartner = profile?.role === 'sustainability_partner';
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-xl font-semibold">Reports</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Generate and download project reports
+          {isPartner ? 'View and download project reports' : 'Generate and download project reports'}
         </p>
       </div>
 
@@ -47,9 +50,9 @@ export default function ReportsPage() {
               </div>
               <h3 className="font-semibold">{type.label}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{type.desc}</p>
-              <Button variant="outline" size="sm" className="mt-4 w-full">
+              <Button variant="outline" size="sm" className="mt-4 w-full" disabled={isPartner}>
                 <Download className="mr-2 h-3.5 w-3.5" />
-                Generate
+                {isPartner ? 'Coming Soon' : 'Generate'}
               </Button>
             </Card>
           );

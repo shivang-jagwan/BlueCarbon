@@ -22,6 +22,7 @@ import {
   Camera,
   Landmark,
   Shield,
+  Clock,
   AlertTriangle,
   Fingerprint,
   type LucideIcon,
@@ -74,12 +75,13 @@ export const VERIFIER_NAV: NavSection[] = [
     items: [
       { label: 'Verification Operations Center', href: '/dashboard/verification', icon: ShieldCheck },
       { label: 'Carbon Passport Requests', href: '/dashboard/verification/passport-requests', icon: Award },
-      { label: 'Monitoring Projects', href: '/dashboard/projects', icon: FolderKanban },
+      { label: 'Lifecycle Monitoring Center', href: '/dashboard/verification/monitoring-projects', icon: FolderKanban },
     ],
   },
   {
     title: 'Workspace',
     items: [
+      { label: 'History', href: '/dashboard/verification/history', icon: Clock },
       { label: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
       { label: 'Calendar', href: '/dashboard/calendar', icon: CalendarDays },
       { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
@@ -107,8 +109,7 @@ export const PARTNER_NAV: NavSection[] = [
   {
     title: 'Engage',
     items: [
-      { label: 'Verifier Directory', href: '/dashboard/verifiers', icon: Building2 },
-      { label: 'Impact Dashboard', href: '/dashboard/impact', icon: BarChart3 },
+      { label: 'Verification Agencies', href: '/dashboard/verification-agencies', icon: Building2 },
       { label: 'Reports', href: '/dashboard/reports', icon: FileText },
     ],
   },

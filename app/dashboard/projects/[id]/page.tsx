@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { getVerificationReportsForProject } from '@/app/actions/verification';
 import { useProject } from '@/hooks/use-projects';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import {
 } from '@/lib/types';
 import { PartnershipInfoCard } from '@/components/workspace/PartnershipInfoCard';
 import { PartnershipLifecycleCard } from '@/components/workspace/PartnershipLifecycleCard';
+import { PendingPartnershipRequests } from '@/components/workspace/PendingPartnershipRequests';
 import { APPLICATION_STATUS_LABELS } from '@/lib/voc-types';
 import Link from 'next/link';
 
@@ -76,21 +78,14 @@ function VerificationReportsList({ projectId, isOwner }: { projectId: string; is
 
   React.useEffect(() => {
     (async () => {
-      const { data: requests } = await supabase
-        .from('voc_requests')
-        .select('id')
-        .eq('project_id', projectId);
-
-      if (requests && requests.length > 0) {
-        const requestIds = requests.map((r: any) => r.id);
-        const { data: apps } = await supabase
-          .from('voc_agency_requests')
-          .select('id, request_id, agency_name, agency_id, verification_status, assigned_verifier, audit_date, last_updated, carbon_passport_status')
-          .in('request_id', requestIds)
-          .order('created_at', { ascending: false });
-        setAgencyRequests(apps || []);
+      try {
+        const apps = await getVerificationReportsForProject(projectId);
+        setAgencyRequests(apps);
+      } catch (err) {
+        console.error('Failed to load verification reports:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, [projectId]);
 
@@ -202,7 +197,7 @@ function VerificationReportsList({ projectId, isOwner }: { projectId: string; is
             return isClickable ? (
               <Link
                 key={req.id}
-                href={`/dashboard/projects/${projectId}/verification/view/${req.id}`}
+                href={`/dashboard/verification/${req.id}`}
                 className={cn(
                   'block p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer',
                   AGENCY_STATUS_STYLES[statusKey] || 'bg-white border-slate-200 hover:border-slate-300'
@@ -271,6 +266,7 @@ export default function ProjectOverviewPage() {
   if (isVerified) {
     return (
       <div className="space-y-6 pb-20">
+        {isOwner && <PendingPartnershipRequests projectId={projectId} />}
         {/* Verification Reports — single source of truth */}
         <VerificationReportsList projectId={projectId} isOwner={isOwner} />
       </div>
@@ -301,6 +297,8 @@ export default function ProjectOverviewPage() {
           </div>
         </div>
       )}
+
+      {isOwner && <PendingPartnershipRequests projectId={projectId} />}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

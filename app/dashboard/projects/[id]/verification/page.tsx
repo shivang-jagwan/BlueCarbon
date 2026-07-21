@@ -5,10 +5,23 @@ import { useParams, useRouter } from 'next/navigation';
 import { useProject } from '@/hooks/use-projects';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
-import { getActiveApplicationForProject, getVerificationAgencies, getActiveVerificationRequestForProject, sendVerificationRequests, applyForCarbonPassport, getCarbonPassportApplicationsForProject } from '@/lib/voc-services';
-import type { VerificationAgency, VerificationRequest, CarbonPassportApplication, CarbonPassportStatus } from '@/lib/voc-types';
-import { AgencyMultiSelect } from '@/components/verification/AgencyMultiSelect';
-import { RequestTracker } from '@/components/verification/RequestTracker';
+import {
+  getApplicationsForProject,
+  getVerificationAgencies,
+  getCarbonPassportApplicationsForProject,
+  sendVerificationRequests,
+  applyForCarbonPassport,
+  getAuditReportForRequest,
+} from '@/lib/voc-services';
+import type {
+  VerificationAgency,
+  CarbonPassportApplication,
+  CarbonPassportStatus,
+  ProjectSnapshot,
+  SnapshotDocument,
+  SnapshotDocumentCategory,
+  AuditReport,
+} from '@/lib/voc-types';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -16,9 +29,8 @@ import {
   CARBON_PASSPORT_STATUS_LABELS,
   CARBON_PASSPORT_STATUS_COLORS,
   type VerificationApplication,
-  type SnapshotDocument,
-  type SnapshotDocumentCategory,
 } from '@/lib/voc-types';
+import { AgencyMultiSelect } from '@/components/verification/AgencyMultiSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -67,9 +79,18 @@ import {
   Loader2,
   Building2,
   Key,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare,
+  RefreshCw,
+  BarChart3,
+  Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+// ── Constants ──────────────────────────────────────────────────
 
 const STEPS = [
   { id: 1, label: 'Project Summary', icon: FileText },
@@ -95,6 +116,18 @@ const ADDITIONAL_DOC_CATEGORIES: { value: SnapshotDocumentCategory; label: strin
   { value: 'other', label: 'Other' },
 ];
 
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Verifications' },
+  { value: 'active', label: 'Active' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'returned', label: 'Returned' },
+  { value: 'rejected', label: 'Rejected' },
+] as const;
+
+type StatusFilter = typeof STATUS_FILTER_OPTIONS[number]['value'];
+
+// ── Types ──────────────────────────────────────────────────────
+
 interface AdditionalDocument {
   id: string;
   name: string;
@@ -102,7 +135,24 @@ interface AdditionalDocument {
   file_type: string;
 }
 
+interface EnrichedCard {
+  application: VerificationApplication;
+  passportStatus: CarbonPassportStatus;
+  passportAppId: string | null;
+  auditReport: AuditReport | null;
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+
 function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatDateLong(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'long',
@@ -110,92 +160,385 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function ActiveApplicationCard({ application, projectId }: { application: VerificationApplication; projectId: string }) {
+function getStatusGroup(status: string): 'active' | 'approved' | 'returned' | 'rejected' {
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'returned_for_revision') return 'returned';
+  return 'active';
+}
+
+function getStatusBorderColor(status: string): string {
+  const group = getStatusGroup(status);
+  if (group === 'active') return 'border-l-blue-500';
+  if (group === 'approved') return 'border-l-emerald-500';
+  if (group === 'returned') return 'border-l-amber-500';
+  return 'border-l-red-500';
+}
+
+// ── ProjectStatusBanner ────────────────────────────────────────
+
+function ProjectStatusBanner({
+  project,
+  applications,
+  passportApps,
+}: {
+  project: any;
+  applications: VerificationApplication[];
+  passportApps: CarbonPassportApplication[];
+}) {
   const router = useRouter();
-  const statusColor = APPLICATION_STATUS_COLORS[application.status];
+  const hasVerified = applications.some(a => a.status === 'approved');
+  const latestVerified = applications
+    .filter(a => a.status === 'approved')
+    .sort((a, b) => new Date(b.submitted_date).getTime() - new Date(a.submitted_date).getTime())[0];
+  const latestPassport = passportApps[0];
+  const passportStatus = latestPassport?.status || 'none';
 
   return (
-    <Card className="rounded-xl border-slate-200 dark:border-slate-800">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-display">Active Verification Application</CardTitle>
-          <Badge className={cn('border-0 text-xs font-semibold', statusColor)}>
-            {APPLICATION_STATUS_LABELS[application.status]}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Application Number</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 font-mono">
-              {application.application_number}
-            </p>
+    <Card className="rounded-xl border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className={cn(
+        'p-5',
+        hasVerified
+          ? 'bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20'
+          : project?.verification_status === 'rejected'
+            ? 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20'
+            : 'bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950/20',
+      )}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl',
+              hasVerified ? 'bg-emerald-100 dark:bg-emerald-900/50' : 'bg-slate-100 dark:bg-slate-800',
+            )}>
+              {hasVerified ? (
+                <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              ) : project?.verification_status === 'rejected' ? (
+                <X className="h-6 w-6 text-red-600 dark:text-red-400" />
+              ) : (
+                <Shield className="h-6 w-6 text-slate-400" />
+              )}
+            </div>
+            <div>
+              <h3 className="font-display text-base font-semibold text-slate-900 dark:text-slate-100">
+                {hasVerified ? 'Project Verified' : project?.verification_status === 'rejected' ? 'Verification Rejected' : 'Verification Pending'}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                {project?.name || 'Untitled Project'} &middot; {PROJECT_TYPE_LABELS[project?.project_type] || project?.project_type || 'Unknown'}
+              </p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Status</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {APPLICATION_STATUS_LABELS[application.status]}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Submitted Date</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {formatDate(application.submitted_date)}
-            </p>
-          </div>
-        </div>
 
-        <Separator />
-
-        <div className="flex items-start gap-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4">
-          <Lock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Project Records Locked</p>
-            <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-              Verification Application is under review. Project records are locked until the certification process is completed.
-            </p>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+              <BarChart3 className="h-3.5 w-3.5 text-slate-500" />
+              <span className="font-medium text-slate-700 dark:text-slate-300">{applications.length} Verification{applications.length !== 1 ? 's' : ''}</span>
+            </div>
+            {latestVerified && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                <CalendarDays className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="text-emerald-700 dark:text-emerald-400 font-medium">Latest: {formatDate(latestVerified.submitted_date)}</span>
+              </div>
+            )}
+            {latestVerified && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                <Building2 className="h-3.5 w-3.5 text-blue-600" />
+                <span className="text-blue-700 dark:text-blue-400 font-medium">{latestVerified.ngo_name}</span>
+              </div>
+            )}
+            {passportStatus !== 'none' && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                <Key className="h-3.5 w-3.5 text-purple-600" />
+                <Badge className={cn('text-[10px] border-0', CARBON_PASSPORT_STATUS_COLORS[passportStatus])}>
+                  {CARBON_PASSPORT_STATUS_LABELS[passportStatus]}
+                </Badge>
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            onClick={() => router.push(`/dashboard/projects/${projectId}/verification/view/${application.id}`)}
-            className="gap-2"
-          >
-            <Eye className="h-4 w-4" />
-            View Application
-          </Button>
-        </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }
 
-function SuccessState({ applicationNumber }: { applicationNumber: string }) {
+// ── VerificationHistoryCard ────────────────────────────────────
+
+function VerificationHistoryCard({
+  card,
+  isExpanded,
+  onToggleExpand,
+  onResubmit,
+  onApplyPassport,
+  onViewPassport,
+  onViewDetails,
+  hasAnyActivePassport,
+}: {
+  card: EnrichedCard;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onResubmit: (app: VerificationApplication) => void;
+  onApplyPassport: (agencyRequestId: string, agencyName: string, requestId: string) => void;
+  onViewPassport: () => void;
+  onViewDetails: (applicationId: string) => void;
+  hasAnyActivePassport: boolean;
+}) {
+  const { application: app, passportStatus, passportAppId, auditReport } = card;
+  const statusColor = APPLICATION_STATUS_COLORS[app.status];
+  const borderColor = getStatusBorderColor(app.status);
+  const group = getStatusGroup(app.status);
+  const isReturned = app.status === 'returned_for_revision';
+  const isRejected = app.status === 'rejected';
+  const isApproved = app.status === 'approved';
+  const isActive = group === 'active';
+
   return (
-    <Card className="rounded-xl border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-          <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200 font-display">
-          Application Submitted
-        </h3>
-        <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300 max-w-md">
-          Your verification application has been submitted successfully. The project snapshot has been created and certification-related records are now read-only.
-        </p>
-        <div className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 px-4 py-2.5">
-          <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 font-mono">
-            {applicationNumber}
+    <Card className={cn('rounded-xl border-slate-200 dark:border-slate-800 border-l-4 transition-all', borderColor)}>
+      <div
+        className="cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
+                <Building2 className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-display font-semibold">{app.ngo_name}</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">{app.application_number}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className={cn('border-0 text-xs font-semibold', statusColor)}>
+                {APPLICATION_STATUS_LABELS[app.status]}
+              </Badge>
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4 text-slate-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+      </div>
+
+      {/* Quick Stats Row */}
+      <div className="px-6 pb-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <CalendarDays className="h-3 w-3" /> {formatDate(app.submitted_date)}
           </span>
+          {app.verifier_name && (
+            <span className="flex items-center gap-1">
+              <ClipboardCheck className="h-3 w-3" /> {app.verifier_name}
+            </span>
+          )}
+          {auditReport && (
+            <span className="flex items-center gap-1">
+              <BarChart3 className="h-3 w-3" /> Audit: {auditReport.tree_count} trees, {auditReport.area_verified} ha
+            </span>
+          )}
+          {isApproved && passportStatus !== 'none' && (
+            <Badge className={cn('text-[10px] border-0', CARBON_PASSPORT_STATUS_COLORS[passportStatus])}>
+              <Key className="h-2.5 w-2.5 mr-0.5" /> {CARBON_PASSPORT_STATUS_LABELS[passportStatus]}
+            </Badge>
+          )}
         </div>
-      </CardContent>
+      </div>
+
+      {/* Expanded Details */}
+      {isExpanded && (
+        <CardContent className="pt-0 space-y-4">
+          <Separator />
+
+          {/* Decision Notes (inline remarks) */}
+          {app.decision_notes && (
+            <div className={cn(
+              'rounded-lg p-4 border',
+              isReturned ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800' :
+              isRejected ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
+              'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800',
+            )}>
+              <div className="flex items-start gap-2">
+                <MessageSquare className={cn(
+                  'h-4 w-4 mt-0.5 shrink-0',
+                  isReturned ? 'text-amber-600' : isRejected ? 'text-red-600' : 'text-blue-600',
+                )} />
+                <div>
+                  <p className={cn(
+                    'text-xs font-semibold mb-1',
+                    isReturned ? 'text-amber-800 dark:text-amber-200' :
+                    isRejected ? 'text-red-800 dark:text-red-200' :
+                    'text-blue-800 dark:text-blue-200',
+                  )}>
+                    Verifier Remarks
+                  </p>
+                  <p className={cn(
+                    'text-sm',
+                    isReturned ? 'text-amber-700 dark:text-amber-300' :
+                    isRejected ? 'text-red-700 dark:text-red-300' :
+                    'text-blue-700 dark:text-blue-300',
+                  )}>
+                    {app.decision_notes}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Audit Report Metrics */}
+          {auditReport && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <BarChart3 className="h-3.5 w-3.5" /> Field Audit Report
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Area Verified</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.area_verified} ha</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Tree Count</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.tree_count.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Species</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.species_count}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Carbon Stock</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.estimated_carbon_stock.toLocaleString()} t</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Biodiversity Index</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.biodiversity_index.toFixed(2)}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Site Condition</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 capitalize">{auditReport.site_condition}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">Photos</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.photos_count}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-medium text-slate-500">GPS Validated</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{auditReport.gps_validated ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+              {auditReport.risks && (
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">Risks Identified</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300">{auditReport.risks}</p>
+                </div>
+              )}
+              {auditReport.corrective_actions && (
+                <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-3">
+                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">Corrective Actions</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">{auditReport.corrective_actions}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Certificate & Passport Status */}
+          {(isApproved || app.verification_certificate) && (
+            <div className="flex flex-wrap gap-2">
+              {app.verification_certificate && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                  <Award className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                    Certificate: {app.verification_certificate.certificate_number}
+                  </span>
+                </div>
+              )}
+              {app.carbon_passport && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                  <Key className="h-4 w-4 text-purple-600" />
+                  <span className="text-xs font-semibold text-purple-800 dark:text-purple-200">
+                    Passport: {app.carbon_passport.passport_number}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); onViewDetails(app.id); }}
+              className="gap-1.5"
+            >
+              <Eye className="h-3.5 w-3.5" /> View Details
+            </Button>
+
+            {isApproved && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onViewDetails(app.id); }}
+                  className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                >
+                  <Award className="h-3.5 w-3.5" /> View Certificate
+                </Button>
+                {auditReport && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onViewDetails(app.id); }}
+                    className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> View Audit Report
+                  </Button>
+                )}
+                {(passportStatus === 'none' || passportStatus === 'rejected') && !hasAnyActivePassport && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onApplyPassport(app.verification_agency_id, app.ngo_name, app.application_number); }}
+                    className="gap-1.5 text-purple-700 border-purple-300 hover:bg-purple-50"
+                  >
+                    <Key className="h-3.5 w-3.5" /> Apply for Passport
+                  </Button>
+                )}
+                {(passportStatus === 'requested' || passportStatus === 'under_processing') && (
+                  <Badge className={cn('text-xs border-0', CARBON_PASSPORT_STATUS_COLORS[passportStatus])}>
+                    <Clock className="h-3 w-3 mr-1" /> {CARBON_PASSPORT_STATUS_LABELS[passportStatus]}
+                  </Badge>
+                )}
+                {passportStatus === 'issued' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onViewPassport(); }}
+                    className="gap-1.5 text-purple-700 border-purple-300 hover:bg-purple-50"
+                  >
+                    <Key className="h-3.5 w-3.5" /> View Passport
+                  </Button>
+                )}
+              </>
+            )}
+
+            {(isReturned || isRejected) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onResubmit(app); }}
+                className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Resubmit
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
+
+// ── StepIndicator (kept as-is) ────────────────────────────────
 
 function StepIndicator({ currentStep, steps }: { currentStep: number; steps: typeof STEPS }) {
   return (
@@ -206,22 +549,18 @@ function StepIndicator({ currentStep, steps }: { currentStep: number; steps: typ
         const isCompleted = currentStep > step.id;
         return (
           <React.Fragment key={step.id}>
-            <div
-              className={cn(
-                'flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors shrink-0',
-                isActive && 'bg-primary/10 text-primary',
-                isCompleted && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
-                !isActive && !isCompleted && 'text-slate-400 dark:text-slate-600',
-              )}
-            >
-              <div
-                className={cn(
-                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                  isActive && 'bg-primary text-primary-foreground',
-                  isCompleted && 'bg-emerald-500 text-white',
-                  !isActive && !isCompleted && 'bg-slate-200 dark:bg-slate-800 text-slate-500',
-                )}
-              >
+            <div className={cn(
+              'flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors shrink-0',
+              isActive && 'bg-primary/10 text-primary',
+              isCompleted && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
+              !isActive && !isCompleted && 'text-slate-400 dark:text-slate-600',
+            )}>
+              <div className={cn(
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                isActive && 'bg-primary text-primary-foreground',
+                isCompleted && 'bg-emerald-500 text-white',
+                !isActive && !isCompleted && 'bg-slate-200 dark:bg-slate-800 text-slate-500',
+              )}>
                 {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.id}
               </div>
               <span className="hidden sm:inline">{step.label}</span>
@@ -236,38 +575,35 @@ function StepIndicator({ currentStep, steps }: { currentStep: number; steps: typ
   );
 }
 
-function Step1ProjectSummary({ project }: { project: any }) {
-  const summaryFields = [
-    { label: 'Project Name', value: project?.name || '—' },
-    { label: 'Project Type', value: PROJECT_TYPE_LABELS[project?.project_type] || project?.project_type || '—' },
-    { label: 'Owner Name', value: project?.owner_name || '—' },
-    { label: 'Area', value: project?.area_hectares ? `${project.area_hectares} hectares` : '—' },
-    { label: 'Location', value: project?.location_name || '—' },
-    { label: 'Description', value: project?.description || '—', full: true },
-    { label: 'Current Status', value: project?.verification_status || '—' },
-  ];
+// ── Step1: Project Summary ─────────────────────────────────────
 
+function Step1ProjectSummary({ project, readOnly, snapshot }: { project: any; readOnly?: boolean; snapshot?: ProjectSnapshot | null }) {
+  const data = snapshot || project;
+  const summaryFields = [
+    { label: 'Project Name', value: data?.project_name || data?.name || '---' },
+    { label: 'Project Type', value: PROJECT_TYPE_LABELS[data?.project_type] || data?.project_type || '---' },
+    { label: 'Owner Name', value: data?.owner_name || '---' },
+    { label: 'Area', value: data?.area_hectares ? `${data.area_hectares} hectares` : '---' },
+    { label: 'Location', value: data?.location_name || data?.location || '---' },
+    { label: 'Description', value: data?.description || '---', full: true },
+    { label: 'Current Status', value: readOnly ? 'Read-only snapshot' : (project?.verification_status || '---') },
+  ];
   return (
     <div className="space-y-4">
+      {readOnly && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          Showing read-only snapshot data from previous verification. To change project details, edit the project directly.
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {summaryFields.map((field) => (
-          <div
-            key={field.label}
-            className={cn('space-y-1.5', field.full && 'sm:col-span-2')}
-          >
+          <div key={field.label} className={cn('space-y-1.5', field.full && 'sm:col-span-2')}>
             <Label className="text-xs font-medium text-slate-500 dark:text-slate-400">{field.label}</Label>
             {field.full ? (
-              <Textarea
-                value={String(field.value)}
-                readOnly
-                className="min-h-[80px] resize-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-              />
+              <Textarea value={String(field.value)} readOnly className="min-h-[80px] resize-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
             ) : (
-              <Input
-                value={String(field.value)}
-                readOnly
-                className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-              />
+              <Input value={String(field.value)} readOnly className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
             )}
           </div>
         ))}
@@ -276,21 +612,31 @@ function Step1ProjectSummary({ project }: { project: any }) {
   );
 }
 
+// ── Step2: Agency Selection ────────────────────────────────────
+
 function Step2AgencySelection({
   selectedAgencies,
   onChange,
+  initialAgencyIds,
 }: {
   selectedAgencies: VerificationAgency[];
   onChange: (agencies: VerificationAgency[]) => void;
+  initialAgencyIds?: string[];
 }) {
   return (
-    <AgencyMultiSelect
-      selected={selectedAgencies}
-      onChange={onChange}
-      maxSelections={5}
-    />
+    <div className="space-y-3">
+      {initialAgencyIds && initialAgencyIds.length > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+          <Building2 className="h-3.5 w-3.5 shrink-0" />
+          Original agencies pre-selected. You may change them before submitting.
+        </div>
+      )}
+      <AgencyMultiSelect selected={selectedAgencies} onChange={onChange} maxSelections={5} />
+    </div>
   );
 }
+
+// ── Step3: Documents ───────────────────────────────────────────
 
 function Step2Documents({
   projectDocuments,
@@ -299,6 +645,11 @@ function Step2Documents({
   onRemoveDoc,
   onUploadFile,
   uploading,
+  resubmitMode,
+  resubmitSnapshotDocs,
+  decisionNotes,
+  keptDocIds,
+  onToggleKeepDoc,
 }: {
   projectDocuments: SnapshotDocument[];
   additionalDocs: AdditionalDocument[];
@@ -306,6 +657,11 @@ function Step2Documents({
   onRemoveDoc: (id: string) => void;
   onUploadFile: (file: File, name: string, category: SnapshotDocumentCategory) => Promise<void>;
   uploading: boolean;
+  resubmitMode?: boolean;
+  resubmitSnapshotDocs?: SnapshotDocument[];
+  decisionNotes?: string;
+  keptDocIds?: Set<string>;
+  onToggleKeepDoc?: (docId: string) => void;
 }) {
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [showUploadForm, setShowUploadForm] = React.useState(false);
@@ -325,19 +681,13 @@ function Step2Documents({
       category: newDocCategory,
       file_type: newDocFileType.trim() || 'Document',
     });
-    setNewDocName('');
-    setNewDocCategory('other');
-    setNewDocFileType('');
-    setShowAddForm(false);
+    setNewDocName(''); setNewDocCategory('other'); setNewDocFileType(''); setShowAddForm(false);
   }
 
   async function handleUpload() {
     if (!uploadFile || !uploadName.trim()) return;
     await onUploadFile(uploadFile, uploadName.trim(), uploadCategory);
-    setUploadFile(null);
-    setUploadName('');
-    setUploadCategory('other');
-    setShowUploadForm(false);
+    setUploadFile(null); setUploadName(''); setUploadCategory('other'); setShowUploadForm(false);
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -349,46 +699,38 @@ function Step2Documents({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  const snapshotDocs = resubmitSnapshotDocs || [];
+  const allDocs = [...projectDocuments, ...additionalDocs];
+
   return (
     <div className="space-y-4">
-      {projectDocuments.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Project Documents</p>
-          <div className="space-y-2">
-            {projectDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center gap-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-3"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <File className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{doc.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      {DOCUMENT_CATEGORY_LABELS[doc.category] || doc.category}
-                    </Badge>
-                    <span className="text-[10px] text-slate-400">{doc.file_type}</span>
-                    <span className="text-[10px] text-slate-400">{formatDate(doc.uploaded_date)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+      {/* Decision notes for resubmit */}
+      {resubmitMode && decisionNotes && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+          <MessageSquare className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Verifier Remarks</p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{decisionNotes}</p>
           </div>
         </div>
       )}
 
-      {additionalDocs.length > 0 && (
+      {/* Snapshot docs (resubmit mode — read-only with keep/replace) */}
+      {resubmitMode && snapshotDocs.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Additional Documents</p>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Previous Documents (Snapshot)</p>
           <div className="space-y-2">
-            {additionalDocs.map((doc) => (
+            {snapshotDocs.map((doc) => (
               <div
                 key={doc.id}
-                className="flex items-center gap-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3"
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border p-3 transition-all',
+                  keptDocIds?.has(doc.id)
+                    ? 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50'
+                    : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/30 opacity-60',
+                )}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500">
                   <File className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -400,21 +742,61 @@ function Step2Documents({
                     <span className="text-[10px] text-slate-400">{doc.file_type}</span>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onRemoveDoc(doc.id)}
-                  className="h-8 w-8 p-0 text-slate-400 hover:text-red-500"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                {onToggleKeepDoc && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={cn(
+                      'text-[10px] cursor-pointer',
+                      keptDocIds?.has(doc.id) ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-red-50 text-red-700 border-red-300',
+                    )} onClick={() => onToggleKeepDoc(doc.id)}>
+                      {keptDocIds?.has(doc.id) ? 'Keeping' : 'Discarded'}
+                    </Badge>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {projectDocuments.length === 0 && additionalDocs.length === 0 && (
+      {/* Current project docs */}
+      {allDocs.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            {resubmitMode ? 'New Documents' : 'Project Documents'}
+          </p>
+          <div className="space-y-2">
+            {allDocs.map((doc) => (
+              <div key={doc.id} className="flex items-center gap-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <File className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{doc.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      {DOCUMENT_CATEGORY_LABELS[doc.category] || doc.category}
+                    </Badge>
+                    <span className="text-[10px] text-slate-400">{doc.file_type}</span>
+                    {'uploaded_date' in doc && <span className="text-[10px] text-slate-400">{formatDate((doc as SnapshotDocument).uploaded_date)}</span>}
+                  </div>
+                </div>
+                {!resubmitMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onRemoveDoc(doc.id)}
+                    className="h-8 w-8 p-0 text-slate-400 hover:text-red-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {allDocs.length === 0 && snapshotDocs.length === 0 && (
         <div className="text-center py-8 text-sm text-slate-400">No documents found for this project.</div>
       )}
 
@@ -426,23 +808,16 @@ function Step2Documents({
           className="hidden"
           accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
         />
-        <Button
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="gap-2"
-        >
+        <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="gap-2">
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          {uploading ? 'Uploading...' : 'Upload Document'}
+          {uploading ? 'Uploading...' : resubmitMode ? 'Upload Replacement' : 'Upload Document'}
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="gap-2 border-dashed"
-        >
-          <Plus className="h-4 w-4" />
-          Add Reference
-        </Button>
+        {!resubmitMode && (
+          <Button variant="outline" onClick={() => setShowAddForm(!showAddForm)} className="gap-2 border-dashed">
+            <Plus className="h-4 w-4" />
+            Add Reference
+          </Button>
+        )}
       </div>
 
       {showUploadForm && uploadFile && (
@@ -487,7 +862,7 @@ function Step2Documents({
         </Card>
       )}
 
-      {showAddForm && (
+      {showAddForm && !resubmitMode && (
         <Card className="border-dashed border-primary/30 bg-primary/5">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -498,19 +873,13 @@ function Step2Documents({
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Document Name</Label>
-              <Input
-                value={newDocName}
-                onChange={(e) => setNewDocName(e.target.value)}
-                placeholder="Enter document name"
-              />
+              <Input value={newDocName} onChange={(e) => setNewDocName(e.target.value)} placeholder="Enter document name" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-xs">Category</Label>
                 <Select value={newDocCategory} onValueChange={(v) => setNewDocCategory(v as SnapshotDocumentCategory)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ADDITIONAL_DOC_CATEGORIES.map((cat) => (
                       <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
@@ -520,16 +889,11 @@ function Step2Documents({
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">File Type</Label>
-                <Input
-                  value={newDocFileType}
-                  onChange={(e) => setNewDocFileType(e.target.value)}
-                  placeholder="e.g. PDF, JPG"
-                />
+                <Input value={newDocFileType} onChange={(e) => setNewDocFileType(e.target.value)} placeholder="e.g. PDF, JPG" />
               </div>
             </div>
             <Button onClick={handleAdd} disabled={!newDocName.trim()} className="gap-2" size="sm">
-              <Plus className="h-3.5 w-3.5" />
-              Add
+              <Plus className="h-3.5 w-3.5" /> Add
             </Button>
           </CardContent>
         </Card>
@@ -538,7 +902,27 @@ function Step2Documents({
   );
 }
 
-function Step3Evidence({ galleryItems, onUploadEvidence, uploading }: { galleryItems: any[]; onUploadEvidence: (files: FileList) => Promise<void>; uploading: boolean }) {
+// ── Step4: Evidence ────────────────────────────────────────────
+
+function Step3Evidence({
+  galleryItems,
+  onUploadEvidence,
+  uploading,
+  resubmitMode,
+  resubmitSnapshotEvidence,
+  decisionNotes,
+  keptEvidenceIds,
+  onToggleKeepEvidence,
+}: {
+  galleryItems: any[];
+  onUploadEvidence: (files: FileList) => Promise<void>;
+  uploading: boolean;
+  resubmitMode?: boolean;
+  resubmitSnapshotEvidence?: any[];
+  decisionNotes?: string;
+  keptEvidenceIds?: Set<string>;
+  onToggleKeepEvidence?: (id: string) => void;
+}) {
   const imageCount = galleryItems.filter((g) => g.type === 'image').length;
   const videoCount = galleryItems.filter((g) => g.type === 'video').length;
   const docCount = galleryItems.filter((g) => g.type === 'document').length;
@@ -551,8 +935,63 @@ function Step3Evidence({ galleryItems, onUploadEvidence, uploading }: { galleryI
     if (evidenceInputRef.current) evidenceInputRef.current.value = '';
   }
 
+  const snapshotEvidence = resubmitSnapshotEvidence || [];
+
   return (
     <div className="space-y-5">
+      {/* Decision notes for resubmit */}
+      {resubmitMode && decisionNotes && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+          <MessageSquare className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Verifier Remarks</p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{decisionNotes}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Snapshot evidence (resubmit mode — read-only with keep/replace) */}
+      {resubmitMode && snapshotEvidence.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Previous Evidence (Snapshot)</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {snapshotEvidence.map((item: any) => (
+              <div
+                key={item.id}
+                className={cn(
+                  'overflow-hidden rounded-lg border transition-all',
+                  keptEvidenceIds?.has(item.id)
+                    ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                    : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/30 opacity-60',
+                )}
+              >
+                {item.url && (
+                  <div className="aspect-video bg-slate-100 dark:bg-slate-800">
+                    <img src={item.url} alt={item.title || ''} className="h-full w-full object-cover" />
+                  </div>
+                )}
+                <div className="p-2">
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{item.title || item.file_name || 'Untitled'}</p>
+                  {onToggleKeepEvidence && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'text-[10px] cursor-pointer mt-1',
+                        keptEvidenceIds?.has(item.id) ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-red-50 text-red-700 border-red-300',
+                      )}
+                      onClick={() => onToggleKeepEvidence(item.id)}
+                    >
+                      {keptEvidenceIds?.has(item.id) ? 'Keeping' : 'Discarded'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Current evidence stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="flex items-center gap-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
@@ -591,25 +1030,19 @@ function Step3Evidence({ galleryItems, onUploadEvidence, uploading }: { galleryI
         accept="image/*,video/*,.pdf,.doc,.docx"
         multiple
       />
-      <Button
-        variant="outline"
-        onClick={() => evidenceInputRef.current?.click()}
-        disabled={uploading}
-        className="gap-2"
-      >
+      <Button variant="outline" onClick={() => evidenceInputRef.current?.click()} disabled={uploading} className="gap-2">
         {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        {uploading ? 'Uploading...' : 'Upload Evidence'}
+        {uploading ? 'Uploading...' : resubmitMode ? 'Upload New Evidence' : 'Upload Evidence'}
       </Button>
 
       {galleryItems.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Evidence Items</p>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            {resubmitMode ? 'New Evidence Items' : 'Evidence Items'}
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {galleryItems.map((item) => (
-              <div
-                key={item.id}
-                className="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
-              >
+              <div key={item.id} className="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                 {item.url && (
                   <div className="aspect-video bg-slate-100 dark:bg-slate-800">
                     {item.type === 'image' ? (
@@ -637,20 +1070,16 @@ function Step3Evidence({ galleryItems, onUploadEvidence, uploading }: { galleryI
         </div>
       )}
 
-      {galleryItems.length === 0 && (
+      {galleryItems.length === 0 && snapshotEvidence.length === 0 && (
         <div className="text-center py-8 text-sm text-slate-400">No evidence items found for this project.</div>
       )}
     </div>
   );
 }
 
-function Step4Declaration({
-  confirmed,
-  onConfirmChange,
-}: {
-  confirmed: boolean;
-  onConfirmChange: (v: boolean) => void;
-}) {
+// ── Step5: Declaration ─────────────────────────────────────────
+
+function Step4Declaration({ confirmed, onConfirmChange }: { confirmed: boolean; onConfirmChange: (v: boolean) => void }) {
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4">
@@ -673,28 +1102,15 @@ function Step4Declaration({
             Once submitted, the verification application and all attached documents become immutable. This action cannot be undone.
           </p>
           <ul className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-300">
-            <li className="flex items-center gap-2">
-              <Lock className="h-3 w-3 shrink-0" />
-              Project documents will be locked
-            </li>
-            <li className="flex items-center gap-2">
-              <Lock className="h-3 w-3 shrink-0" />
-              Evidence center will become read-only
-            </li>
-            <li className="flex items-center gap-2">
-              <Lock className="h-3 w-3 shrink-0" />
-              Application data snapshot will be frozen
-            </li>
+            <li className="flex items-center gap-2"><Lock className="h-3 w-3 shrink-0" /> Project documents will be locked</li>
+            <li className="flex items-center gap-2"><Lock className="h-3 w-3 shrink-0" /> Evidence center will become read-only</li>
+            <li className="flex items-center gap-2"><Lock className="h-3 w-3 shrink-0" /> Application data snapshot will be frozen</li>
           </ul>
         </div>
       </div>
 
       <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-slate-200 dark:border-slate-800 p-4 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-        <Checkbox
-          checked={confirmed}
-          onCheckedChange={(checked) => onConfirmChange(checked === true)}
-          className="mt-0.5"
-        />
+        <Checkbox checked={confirmed} onCheckedChange={(checked) => onConfirmChange(checked === true)} className="mt-0.5" />
         <span className="text-sm text-slate-700 dark:text-slate-300">
           I confirm that all information provided is accurate and complete. I understand that once submitted, the verification application and all attached documents become immutable.
         </span>
@@ -703,23 +1119,26 @@ function Step4Declaration({
   );
 }
 
+// ── Step6: Review ──────────────────────────────────────────────
+
 function Step5Review({
   project,
   projectDocuments,
   additionalDocs,
   galleryItems,
   selectedAgencies,
+  resubmitMode,
 }: {
   project: any;
   projectDocuments: SnapshotDocument[];
   additionalDocs: AdditionalDocument[];
   galleryItems: any[];
   selectedAgencies: VerificationAgency[];
+  resubmitMode?: boolean;
 }) {
   const totalDocs = projectDocuments.length + additionalDocs.length;
   const imageCount = galleryItems.filter((g) => (g.media_type || g.type) === 'image').length;
   const videoCount = galleryItems.filter((g) => (g.media_type || g.type) === 'video').length;
-
   const agencyNames = selectedAgencies.map(a => a.name).join(', ') || '—';
 
   const reviewSections = [
@@ -734,6 +1153,12 @@ function Step5Review({
 
   return (
     <div className="space-y-5">
+      {resubmitMode && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+          <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+          This is a resubmission. A new verification request will be created alongside the previous record.
+        </div>
+      )}
       <div className="rounded-lg border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
         {reviewSections.map((section) => (
           <div key={section.label} className="flex items-center justify-between px-4 py-3">
@@ -775,580 +1200,381 @@ function Step5Review({
   );
 }
 
+// ── LoadingSkeleton ────────────────────────────────────────────
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
+      <div className="h-28 rounded-xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
       <div className="space-y-2">
         <div className="h-8 w-72 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
         <div className="h-4 w-96 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
       </div>
-      <div className="h-12 rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse" />
-      <div className="h-80 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 animate-pulse">
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-12 rounded-lg bg-slate-100 dark:bg-slate-800" />
-          ))}
-        </div>
+      <div className="flex gap-3">
+        <div className="h-10 w-40 rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse" />
+        <div className="h-10 w-56 rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse" />
+        <div className="h-10 w-32 rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse" />
       </div>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-32 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 animate-pulse">
+          <div className="space-y-3">
+            <div className="h-4 w-48 rounded bg-slate-100 dark:bg-slate-800" />
+            <div className="h-3 w-32 rounded bg-slate-100 dark:bg-slate-800" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function VerifiedProjectSummary({ project }: { project: any }) {
-  const router = useRouter();
-  const { profile } = useAuth();
-  const hasMetrics = project.verified_area_hectares || project.verified_tree_count || project.verified_carbon_tonnes;
-  const [passportApps, setPassportApps] = React.useState<CarbonPassportApplication[]>([]);
-  const [passportLoading, setPassportLoading] = React.useState(true);
-  const [applying, setApplying] = React.useState(false);
-  const [showConfirm, setShowConfirm] = React.useState(false);
-  const [approvedAgency, setApprovedAgency] = React.useState<{ agencyId: string; agencyName: string; requestId: string } | null>(null);
+// ── EmptyState ─────────────────────────────────────────────────
 
-  React.useEffect(() => {
-    (async () => {
-      const apps = await getCarbonPassportApplicationsForProject(project.id);
-      setPassportApps(apps);
-
-      // Find the approved agency for this project
-      const { data: requests } = await supabase
-        .from('voc_requests')
-        .select('id')
-        .eq('project_id', project.id);
-
-      if (requests && requests.length > 0) {
-        const requestIds = requests.map((r: any) => r.id);
-        const { data: agencyRows } = await supabase
-          .from('voc_agency_requests')
-          .select('agency_id, agency_name, request_id')
-          .in('request_id', requestIds)
-          .eq('verification_status', 'approved')
-          .limit(1)
-          .maybeSingle();
-
-        if (agencyRows) {
-          setApprovedAgency({
-            agencyId: agencyRows.agency_id,
-            agencyName: agencyRows.agency_name,
-            requestId: agencyRows.request_id,
-          });
-        }
-      }
-      setPassportLoading(false);
-    })();
-  }, [project.id]);
-
-  const latestPassport = passportApps[0];
-  const passportStatus = latestPassport?.status || 'none';
-  const isPassportApplied = passportStatus === 'requested' || passportStatus === 'under_processing';
-  const isPassportIssued = passportStatus === 'issued';
-
-  async function handleApplyPassport() {
-    if (!approvedAgency || !profile) return;
-    setApplying(true);
-    try {
-      await applyForCarbonPassport({
-        requestId: approvedAgency.requestId,
-        projectId: project.id,
-        projectName: project.name,
-        projectOwnerId: profile.id,
-        projectOwnerName: profile.full_name || 'Owner',
-        agencyId: approvedAgency.agencyId,
-        agencyName: approvedAgency.agencyName,
-        assignedVerifier: null,
-        verificationReportRef: null,
-        auditReportRef: null,
-      });
-      toast.success('Carbon Passport application submitted!');
-      setShowConfirm(false);
-      const apps = await getCarbonPassportApplicationsForProject(project.id);
-      setPassportApps(apps);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to apply');
-    }
-    setApplying(false);
-  }
-
+function EmptyState({ onRequestVerification }: { onRequestVerification: () => void }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <CheckCircle2 className="h-6 w-6 text-green-600" />
-          Verified Project
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          This project has been verified. All project data and documents are now read-only.
-        </p>
+    <div className="text-center py-16">
+      <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
+        <Shield className="h-8 w-8 text-slate-400" />
       </div>
-
-      {/* Verification Status Banner */}
-      <div className="rounded-xl bg-green-50 border border-green-200 p-6">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100">
-            <Award className="h-6 w-6 text-green-700" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-green-900">Verification Completed</h2>
-            <p className="text-sm text-green-700 mt-1">
-              This project has completed the full MRV verification cycle and is now a verified blue carbon project.
-            </p>
-            <div className="flex flex-wrap gap-3 mt-3">
-              <Badge className="bg-green-100 text-green-800 border-green-300">
-                <CheckCircle2 className="h-3 w-3 mr-1" /> Verified
-              </Badge>
-              {project.updated_at && (
-                <Badge variant="outline" className="text-green-700 border-green-300">
-                  <CalendarDays className="h-3 w-3 mr-1" /> Approved {formatDate(project.updated_at)}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Carbon Passport Section */}
-      {!passportLoading && (
-        <Card className="rounded-xl border-slate-200 dark:border-slate-800 overflow-hidden p-0">
-          <div className="gradient-ocean p-6 text-white">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
-                <Key className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Carbon Passport</h2>
-                <p className="text-sm text-white/80">Digital certificate of verified carbon credits</p>
-              </div>
-            </div>
-          </div>
-          <div className="p-6">
-            {isPassportIssued ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-green-800">Carbon Passport Issued</p>
-                    <p className="text-xs text-green-600">
-                      Passport Number: {latestPassport.passportNumber || 'Generated'}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/dashboard/projects/${project.id}/official-records`)}
-                >
-                  <Award className="mr-2 h-4 w-4" /> View in Official Records
-                </Button>
-              </div>
-            ) : isPassportApplied ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
-                  <Clock className="h-5 w-5 text-blue-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-blue-800">
-                      {passportStatus === 'requested' ? 'Application Submitted' : 'Under Review'}
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      Your Carbon Passport application is being reviewed by the verification agency.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={CARBON_PASSPORT_STATUS_COLORS[passportStatus]}>
-                    {CARBON_PASSPORT_STATUS_LABELS[passportStatus]}
-                  </Badge>
-                  {latestPassport?.agencyName && (
-                    <Badge variant="outline">{latestPassport.agencyName}</Badge>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="text-center py-4">
-                  <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 mb-3">
-                    <Key className="h-7 w-7 text-slate-400" />
-                  </div>
-                  <h3 className="font-semibold text-lg">Carbon Passport Not Applied</h3>
-                  <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-                    Apply for a Carbon Passport to receive a digital certificate of your verified carbon credits.
-                  </p>
-                </div>
-                <div className="flex justify-center">
-                  <Button
-                    size="lg"
-                    className="h-12 px-8 text-base font-semibold bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => setShowConfirm(true)}
-                  >
-                    <Key className="mr-2 h-5 w-5" />
-                    Apply for Carbon Passport
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* Project Information */}
-      <Card className="rounded-xl border-slate-200 dark:border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-base font-display">Project Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Project Name</p>
-              <p className="text-sm font-semibold">{project.name}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Project Type</p>
-              <p className="text-sm font-semibold">{PROJECT_TYPE_LABELS[project.project_type] || project.project_type}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Location</p>
-              <p className="text-sm font-semibold">{project.location_name || '—'}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Project Status</p>
-              <Badge className="bg-green-100 text-green-800 border-green-300 text-xs">Verified</Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Verified Metrics */}
-      {hasMetrics && (
-        <Card className="rounded-xl border-slate-200 dark:border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-base font-display flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-green-600" />
-              Verified Environmental Metrics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {project.verified_area_hectares && (
-                <div className="rounded-lg bg-green-50 dark:bg-green-900/10 p-3 border border-green-200 dark:border-green-800">
-                  <p className="text-xs font-medium text-green-700 dark:text-green-400">Verified Area</p>
-                  <p className="text-lg font-bold text-green-900 dark:text-green-300 mt-1">
-                    {Number(project.verified_area_hectares).toLocaleString()} ha
-                  </p>
-                </div>
-              )}
-              {project.verified_tree_count && (
-                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/10 p-3 border border-emerald-200 dark:border-emerald-800">
-                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Tree Count</p>
-                  <p className="text-lg font-bold text-emerald-900 dark:text-emerald-300 mt-1">
-                    {Number(project.verified_tree_count).toLocaleString()}
-                  </p>
-                </div>
-              )}
-              {project.verified_species_count && (
-                <div className="rounded-lg bg-teal-50 dark:bg-teal-900/10 p-3 border border-teal-200 dark:border-teal-800">
-                  <p className="text-xs font-medium text-teal-700 dark:text-teal-400">Species Count</p>
-                  <p className="text-lg font-bold text-teal-900 dark:text-teal-300 mt-1">
-                    {Number(project.verified_species_count).toLocaleString()}
-                  </p>
-                </div>
-              )}
-              {project.verified_carbon_tonnes && (
-                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/10 p-3 border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Carbon Sequestration</p>
-                  <p className="text-lg font-bold text-blue-900 dark:text-blue-300 mt-1">
-                    {Number(project.verified_carbon_tonnes).toLocaleString()} t
-                  </p>
-                </div>
-              )}
-              {project.verified_biomass_carbon && (
-                <div className="rounded-lg bg-cyan-50 dark:bg-cyan-900/10 p-3 border border-cyan-200 dark:border-cyan-800">
-                  <p className="text-xs font-medium text-cyan-700 dark:text-cyan-400">Biomass Carbon</p>
-                  <p className="text-lg font-bold text-cyan-900 dark:text-cyan-300 mt-1">
-                    {Number(project.verified_biomass_carbon).toLocaleString()} t
-                  </p>
-                </div>
-              )}
-              {project.verified_soil_organic_carbon && (
-                <div className="rounded-lg bg-amber-50 dark:bg-amber-900/10 p-3 border border-amber-200 dark:border-amber-800">
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Soil Organic Carbon</p>
-                  <p className="text-lg font-bold text-amber-900 dark:text-amber-300 mt-1">
-                    {Number(project.verified_soil_organic_carbon).toLocaleString()} t
-                  </p>
-                </div>
-              )}
-              {project.verified_biodiversity_index && (
-                <div className="rounded-lg bg-purple-50 dark:bg-purple-900/10 p-3 border border-purple-200 dark:border-purple-800">
-                  <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Biodiversity Index</p>
-                  <p className="text-lg font-bold text-purple-900 dark:text-purple-300 mt-1">
-                    {Number(project.verified_biodiversity_index).toFixed(2)}
-                  </p>
-                </div>
-              )}
-              {project.verified_ecosystem_health && (
-                <div className="rounded-lg bg-rose-50 dark:bg-rose-900/10 p-3 border border-rose-200 dark:border-rose-800">
-                  <p className="text-xs font-medium text-rose-700 dark:text-rose-400">Ecosystem Health</p>
-                  <p className="text-lg font-bold text-rose-900 dark:text-rose-300 mt-1">
-                    {project.verified_ecosystem_health}
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Quick Links */}
-      <Card className="rounded-xl border-slate-200 dark:border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-base font-display">Quick Links</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Button
-              variant="outline"
-              className="justify-start gap-2 h-auto py-3"
-              onClick={() => router.push(`/dashboard/projects/${project.id}/official-records`)}
-            >
-              <Award className="h-4 w-4 text-green-600" />
-              <div className="text-left">
-                <p className="text-sm font-semibold">Official Records</p>
-                <p className="text-xs text-muted-foreground">Certificates & audit reports</p>
-              </div>
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start gap-2 h-auto py-3"
-              onClick={() => router.push(`/dashboard/projects/${project.id}/documents`)}
-            >
-              <FileText className="h-4 w-4 text-blue-600" />
-              <div className="text-left">
-                <p className="text-sm font-semibold">Project Documents</p>
-                <p className="text-xs text-muted-foreground">All verified documents</p>
-              </div>
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start gap-2 h-auto py-3"
-              onClick={() => router.push(`/dashboard/projects/${project.id}/passport`)}
-            >
-              <ShieldCheck className="h-4 w-4 text-purple-600" />
-              <div className="text-left">
-                <p className="text-sm font-semibold">Carbon Passport</p>
-                <p className="text-xs text-muted-foreground">View passport details</p>
-              </div>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Read-only notice */}
-      <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 flex items-start gap-3">
-        <Lock className="h-5 w-5 text-slate-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-slate-700">Read-Only Project</p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            All project data, documents, and evidence are now locked after verification approval. To make changes, please contact the verification agency.
-          </p>
-        </div>
-      </div>
-
-      {/* Confirmation Dialog */}
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Apply Carbon Passport?</DialogTitle>
-            <DialogDescription>
-              Your project has already been verified. This request will be sent to the verification agency that approved your project.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <p className="text-sm font-semibold text-green-800">Verification Completed</p>
-              </div>
-              <p className="text-xs text-green-700">
-                Your project &quot;{project.name}&quot; has been fully verified. The Carbon Passport application will be sent to the same agency.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
-              <Button
-                onClick={handleApplyPassport}
-                disabled={applying}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                {applying ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-                ) : (
-                  <><Key className="mr-2 h-4 w-4" /> Submit Request</>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">No Verification Records</h3>
+      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+        This project has not been submitted for verification yet. Request verification to start the MRV process with a certified agency.
+      </p>
+      <Button onClick={onRequestVerification} className="mt-6 gap-2">
+        <Plus className="h-4 w-4" /> Request Verification
+      </Button>
     </div>
   );
 }
+
+// ── Main Component ─────────────────────────────────────────────
 
 export default function VerificationSubmitPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
   const { project, loading: projectLoading } = useProject(projectId);
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
-  const [activeApplication, setActiveApplication] = React.useState<VerificationApplication | null>(null);
+  // Data state
+  const [applications, setApplications] = React.useState<VerificationApplication[]>([]);
+  const [passportApps, setPassportApps] = React.useState<CarbonPassportApplication[]>([]);
+  const [passportStatusMap, setPassportStatusMap] = React.useState<Record<string, CarbonPassportStatus>>({});
+  const [auditReports, setAuditReports] = React.useState<Record<string, AuditReport>>({});
   const [loading, setLoading] = React.useState(true);
+
+  // UI state
+  const [showWizard, setShowWizard] = React.useState(false);
+  const [expandedCardId, setExpandedCardId] = React.useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = React.useState<StatusFilter>('all');
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [sortOldest, setSortOldest] = React.useState(false);
+
+  // Wizard state
   const [step, setStep] = React.useState(1);
+  const [selectedAgencies, setSelectedAgencies] = React.useState<VerificationAgency[]>([]);
   const [projectDocuments, setProjectDocuments] = React.useState<SnapshotDocument[]>([]);
   const [galleryItems, setGalleryItems] = React.useState<any[]>([]);
   const [additionalDocs, setAdditionalDocs] = React.useState<AdditionalDocument[]>([]);
   const [confirmed, setConfirmed] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [submitted, setSubmitted] = React.useState(false);
   const [uploadingDoc, setUploadingDoc] = React.useState(false);
   const [uploadingEvidence, setUploadingEvidence] = React.useState(false);
-  const [selectedAgencies, setSelectedAgencies] = React.useState<VerificationAgency[]>([]);
-  const [submittingRequest, setSubmittingRequest] = React.useState(false);
-  const [activeRequest, setActiveRequest] = React.useState<VerificationRequest | null>(null);
-  const [passportApps, setPassportApps] = React.useState<CarbonPassportApplication[]>([]);
+
+  // Resubmit state
+  const [resubmitMode, setResubmitMode] = React.useState(false);
+  const [resubmitSnapshot, setResubmitSnapshot] = React.useState<ProjectSnapshot | null>(null);
+  const [resubmitDecisionNotes, setResubmitDecisionNotes] = React.useState('');
+  const [resubmitOriginalAgencyId, setResubmitOriginalAgencyId] = React.useState<string | null>(null);
+  const [keptDocIds, setKeptDocIds] = React.useState<Set<string>>(new Set());
+  const [keptEvidenceIds, setKeptEvidenceIds] = React.useState<Set<string>>(new Set());
+
+  // Passport dialog
+  const [passportDialogOpen, setPassportDialogOpen] = React.useState(false);
+  const [passportTarget, setPassportTarget] = React.useState<{ agencyRequestId: string; agencyName: string; requestId: string } | null>(null);
+  const [applyingPassport, setApplyingPassport] = React.useState(false);
+
+  // ── Data Fetching ─────────────────────────────────────────────
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      const existing = await getActiveVerificationRequestForProject(projectId);
-      if (!cancelled && existing) {
-        setActiveRequest(existing);
-        const apps = await getCarbonPassportApplicationsForProject(projectId);
-        if (!cancelled) setPassportApps(apps);
+      try {
+        const [apps, pApps] = await Promise.all([
+          getApplicationsForProject(projectId),
+          getCarbonPassportApplicationsForProject(projectId),
+        ]);
+
+        // Fetch passport status per agency request
+        const agencyIds = apps.map(a => a.id);
+        let psMap: Record<string, CarbonPassportStatus> = {};
+        if (agencyIds.length > 0) {
+          const { data: agencyRows } = await supabase
+            .from('voc_agency_requests')
+            .select('id, carbon_passport_status')
+            .in('id', agencyIds);
+          (agencyRows || []).forEach((row: any) => {
+            psMap[row.id] = (row.carbon_passport_status as CarbonPassportStatus) || 'none';
+          });
+        }
+
+        // Fetch audit reports for completed/approved applications
+        const arMap: Record<string, AuditReport> = {};
+        const reportApps = apps.filter(a => ['audit_completed', 'approved'].includes(a.status));
+        await Promise.all(
+          reportApps.map(async (a) => {
+            try {
+              const report = await getAuditReportForRequest(a.id);
+              if (report) arMap[a.id] = report;
+            } catch { /* skip */ }
+          })
+        );
+
+        if (!cancelled) {
+          setApplications(apps);
+          setPassportApps(pApps);
+          setPassportStatusMap(psMap);
+          setAuditReports(arMap);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [projectId]);
 
-  React.useEffect(() => {
-    if (!projectId) return;
-    let cancelled = false;
-    (async () => {
-      const app = await getActiveApplicationForProject(projectId);
-      if (!cancelled) {
-        setActiveApplication(app || null);
-        setLoading(false);
+  // ── Filtered & Sorted Applications ────────────────────────────
+
+  const filteredApplications = React.useMemo(() => {
+    let result = [...applications];
+
+    // Filter by status
+    if (filterStatus !== 'all') {
+      result = result.filter(a => {
+        const group = getStatusGroup(a.status);
+        if (filterStatus === 'active') return group === 'active';
+        if (filterStatus === 'approved') return group === 'approved';
+        if (filterStatus === 'returned') return group === 'returned';
+        if (filterStatus === 'rejected') return group === 'rejected';
+        return true;
+      });
+    }
+
+    // Search by agency name or request number
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(a =>
+        a.ngo_name.toLowerCase().includes(q) ||
+        a.application_number.toLowerCase().includes(q) ||
+        a.verifier_name?.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      const da = new Date(a.submitted_date).getTime();
+      const db = new Date(b.submitted_date).getTime();
+      return sortOldest ? da - db : db - da;
+    });
+
+    return result;
+  }, [applications, filterStatus, searchQuery, sortOldest]);
+
+  // Group filtered applications
+  const groupedApplications = React.useMemo(() => {
+    const groups: { label: string; items: EnrichedCard[] }[] = [];
+    const active: EnrichedCard[] = [];
+    const approved: EnrichedCard[] = [];
+    const returned: EnrichedCard[] = [];
+    const rejected: EnrichedCard[] = [];
+
+    filteredApplications.forEach(a => {
+      const card: EnrichedCard = {
+        application: a,
+        passportStatus: passportStatusMap[a.id] || 'none',
+        passportAppId: null,
+        auditReport: auditReports[a.id] || null,
+      };
+      const group = getStatusGroup(a.status);
+      if (group === 'active') active.push(card);
+      else if (group === 'approved') approved.push(card);
+      else if (group === 'returned') returned.push(card);
+      else rejected.push(card);
+    });
+
+    if (active.length > 0) groups.push({ label: 'Active', items: active });
+    if (approved.length > 0) groups.push({ label: 'Approved', items: approved });
+    if (returned.length > 0) groups.push({ label: 'Returned', items: returned });
+    if (rejected.length > 0) groups.push({ label: 'Rejected', items: rejected });
+
+    return groups;
+  }, [filteredApplications, passportStatusMap, auditReports]);
+
+  // Global passport guard: true if ANY agency already has an active passport request
+  const hasAnyActivePassport = React.useMemo(
+    () => Object.values(passportStatusMap).some(s => s === 'requested' || s === 'under_processing'),
+    [passportStatusMap]
+  );
+
+  // ── Handlers ──────────────────────────────────────────────────
+
+  function handleRequestVerification() {
+    setResubmitMode(false);
+    setResubmitSnapshot(null);
+    setResubmitDecisionNotes('');
+    setResubmitOriginalAgencyId(null);
+    setKeptDocIds(new Set());
+    setKeptEvidenceIds(new Set());
+    setStep(1);
+    setShowWizard(true);
+  }
+
+  async function handleResubmit(app: VerificationApplication) {
+    try {
+      // Fetch the snapshot from the previous request
+      const { data: req } = await supabase
+        .from('voc_requests')
+        .select('snapshot')
+        .eq('id', app.application_number)
+        .maybeSingle();
+
+      const snapshot = (req?.snapshot as ProjectSnapshot) || null;
+
+      setResubmitMode(true);
+      setResubmitSnapshot(snapshot);
+      setResubmitDecisionNotes(app.decision_notes || '');
+      setResubmitOriginalAgencyId(app.ngo_id);
+
+      // Pre-select the original agency
+      if (app.ngo_id) {
+        const agencies = await getVerificationAgencies();
+        const original = agencies.find(a => a.id === app.ngo_id);
+        if (original) setSelectedAgencies([original]);
       }
-    })();
-    return () => { cancelled = true; };
-  }, [projectId]);
 
-  React.useEffect(() => {
-    if (!projectId || activeApplication) return;
-    (async () => {
-      const { data: docs } = await supabase
-        .from('project_documents_v2')
-        .select('*')
-        .eq('project_id', projectId);
-      setProjectDocuments((docs as SnapshotDocument[]) || []);
+      // Keep all snapshot docs/evidence by default
+      if (snapshot) {
+        setKeptDocIds(new Set((snapshot.documents || []).map(d => d.id)));
+        setKeptEvidenceIds(new Set((snapshot.evidence_items || []).map(e => e.id)));
+      }
 
-      const { data: gallery } = await supabase
-        .from('project_gallery_items')
-        .select('*')
-        .eq('project_id', projectId);
-      setGalleryItems(gallery || []);
-    })();
-  }, [projectId, activeApplication]);
+      setStep(1);
+      setShowWizard(true);
+      toast.info('Resubmission mode: snapshot loaded. Review and update sections as needed.');
+    } catch (err) {
+      toast.error('Failed to load previous snapshot');
+    }
+  }
+
+  function handleToggleKeepDoc(docId: string) {
+    setKeptDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  }
+
+  function handleToggleKeepEvidence(id: string) {
+    setKeptEvidenceIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function handleAddDoc(doc: AdditionalDocument) {
-    setAdditionalDocs((prev) => [...prev, doc]);
+    setAdditionalDocs(prev => [...prev, doc]);
   }
 
   function handleRemoveDoc(id: string) {
-    setAdditionalDocs((prev) => prev.filter((d) => d.id !== id));
+    setAdditionalDocs(prev => prev.filter(d => d.id !== id));
   }
 
   async function handleUploadDocFile(file: File, name: string, category: SnapshotDocumentCategory) {
-    if (!profile) return;
     setUploadingDoc(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${projectId}/docs/${Date.now()}.${fileExt}`;
-
+      const filePath = `${projectId}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('project-documents')
-        .upload(filePath, file, { cacheControl: '3600', upsert: false });
-
+        .upload(filePath, file, { contentType: file.type, upsert: false });
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('project-documents').getPublicUrl(filePath);
-
-      const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document';
-
-      const { data: docRecord, error: dbError } = await supabase
+      const { data: record, error: insertError } = await supabase
         .from('project_documents_v2')
         .insert({
           project_id: projectId,
-          uploaded_by: profile.id,
+          uploaded_by: user?.id || profile?.id,
           document_name: name,
-          category: category,
-          file_name: file.name,
-          storage_path: filePath,
-          file_size: file.size,
+          category,
           mime_type: file.type,
-          status: 'uploaded',
+          file_size: file.size,
+          storage_path: filePath,
         })
         .select()
         .single();
+      if (insertError) throw insertError;
 
-      if (dbError) throw dbError;
-
-      if (docRecord) {
-        setProjectDocuments((prev) => [...prev, docRecord as SnapshotDocument]);
+      if (record) {
+        setProjectDocuments(prev => [...prev, {
+          id: record.id,
+          name: record.document_name,
+          category: record.category,
+          file_type: record.mime_type || 'document',
+          file_size: `${Math.round((record.file_size || 0) / 1024)} KB`,
+          uploaded_date: record.created_at,
+          quality_score: 80,
+          gps_available: false,
+          metadata_available: false,
+          ai_summary: {
+            confidence_score: 80, missing_documents: [], quality_issues: [],
+            duplicate_detected: false, gps_metadata: false, image_metadata: false,
+            overall_assessment: 'Uploaded',
+          },
+          storage_path: filePath,
+        }]);
       }
-
-      toast.success('Document uploaded successfully');
+      toast.success('Document uploaded');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to upload document');
+      toast.error(err instanceof Error ? err.message : 'Failed to upload');
     } finally {
       setUploadingDoc(false);
     }
   }
 
   async function handleUploadEvidence(files: FileList) {
-    if (!profile) return;
     setUploadingEvidence(true);
     try {
       for (const file of Array.from(files)) {
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${projectId}/evidence/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${fileExt}`;
-        const bucket = file.type.startsWith('video/') ? 'project-gallery' : 'project-gallery';
-
+        const filePath = `${projectId}/${Date.now()}_${file.name}`;
         const { error: uploadError } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, file, { cacheControl: '3600', upsert: false });
-
+          .from('project-gallery')
+          .upload(filePath, file, { contentType: file.type, upsert: false });
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-
-        const itemType: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
-
-        const { data: itemRecord, error: dbError } = await supabase
+        const { data: record } = await supabase
           .from('project_gallery_items')
           .insert({
             project_id: projectId,
-            uploaded_by: profile.id,
-            caption: file.name,
-            media_type: itemType,
-            public_url: urlData.publicUrl,
             file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
+            caption: file.name,
+            media_type: file.type.startsWith('video') ? 'video' : 'image',
             storage_path: filePath,
+            mime_type: file.type,
           })
           .select()
           .single();
 
-        if (dbError) throw dbError;
-
-        if (itemRecord) {
-          setGalleryItems((prev) => [...prev, itemRecord]);
+        if (record) {
+          setGalleryItems(prev => [...prev, {
+            id: record.id,
+            title: record.caption || record.file_name,
+            type: record.media_type,
+            url: undefined,
+            storage_path: filePath,
+            created_at: record.created_at,
+          }]);
         }
       }
       toast.success(`${files.length} file(s) uploaded`);
@@ -1362,9 +1588,101 @@ export default function VerificationSubmitPage() {
   async function handleSubmit() {
     if (!project || !profile || selectedAgencies.length === 0) return;
     setSubmitting(true);
-
     try {
-      // Build snapshot from project data, documents, and gallery
+      // Build documents array
+      const snapshotDocs: SnapshotDocument[] = [];
+
+      // Keeped snapshot docs (resubmit mode)
+      if (resubmitMode && resubmitSnapshot) {
+        for (const doc of resubmitSnapshot.documents || []) {
+          if (keptDocIds.has(doc.id)) {
+            snapshotDocs.push(doc);
+          }
+        }
+      }
+
+      // Current project docs
+      for (const doc of projectDocuments) {
+        const storagePath = doc.storage_path as string | undefined;
+        let url = doc.url;
+        if (!url && storagePath) {
+          const { data: signed } = await supabase.storage.from('project-documents').createSignedUrl(storagePath, 3600);
+          url = signed?.signedUrl;
+        }
+        snapshotDocs.push({
+          id: doc.id || Math.random().toString(),
+          name: doc.name,
+          category: doc.category,
+          file_type: doc.file_type,
+          file_size: doc.file_size,
+          uploaded_date: doc.uploaded_date,
+          quality_score: 80,
+          gps_available: false,
+          metadata_available: false,
+          ai_summary: {
+            confidence_score: 80, missing_documents: [], quality_issues: [],
+            duplicate_detected: false, gps_metadata: false, image_metadata: false,
+            overall_assessment: 'Included',
+          },
+          url,
+          storage_path: storagePath,
+        });
+      }
+
+      // Additional docs
+      for (const doc of additionalDocs) {
+        snapshotDocs.push({
+          id: doc.id,
+          name: doc.name,
+          category: doc.category,
+          file_type: doc.file_type,
+          file_size: '0 KB',
+          uploaded_date: new Date().toISOString(),
+          quality_score: 70,
+          gps_available: false,
+          metadata_available: false,
+          ai_summary: {
+            confidence_score: 70, missing_documents: [], quality_issues: [],
+            duplicate_detected: false, gps_metadata: false, image_metadata: false,
+            overall_assessment: 'Reference document',
+          },
+        });
+      }
+
+      // Build evidence array
+      const snapshotEvidence: any[] = [];
+
+      // Kept snapshot evidence (resubmit mode)
+      if (resubmitMode && resubmitSnapshot) {
+        for (const item of resubmitSnapshot.evidence_items || []) {
+          if (keptEvidenceIds.has(item.id)) {
+            snapshotEvidence.push(item);
+          }
+        }
+      }
+
+      // Current gallery items
+      for (const item of galleryItems) {
+        const storagePath = item.storage_path as string | undefined;
+        let url = item.url;
+        if (!url && storagePath) {
+          const { data: signed } = await supabase.storage.from('project-gallery').createSignedUrl(storagePath, 3600);
+          url = signed?.signedUrl;
+        }
+        snapshotEvidence.push({
+          id: item.id || Math.random().toString(),
+          title: item.title || item.file_name || 'Evidence',
+          description: '',
+          type: item.type || 'image',
+          location: project.location_name || '',
+          date_collected: item.created_at || new Date().toISOString(),
+          url,
+          storage_path: storagePath,
+          file_type: item.mime_type || '',
+          file_name: item.file_name || '',
+        });
+      }
+
       const snapshot = {
         project_name: project.name,
         project_type: project.project_type || '',
@@ -1373,7 +1691,7 @@ export default function VerificationSubmitPage() {
         longitude: project.center_lng || 0,
         area_hectares: project.area_hectares || 0,
         description: project.description || '',
-        methodology: (project as unknown as Record<string, unknown>).methodology as string || '',
+        methodology: (project as any).methodology || '',
         start_date: project.start_date || '',
         target_end_date: project.end_date || '',
         estimated_carbon_sequestration: project.target_carbon_tonnes || 0,
@@ -1381,61 +1699,11 @@ export default function VerificationSubmitPage() {
         owner_name: profile.full_name || '',
         owner_email: profile.email || '',
         owner_organization: profile.organization || '',
-        documents: await Promise.all(projectDocuments.map(async (doc: any) => {
-          const storagePath = doc.storage_path as string | undefined;
-          const publicUrl = doc.public_url as string | undefined;
-          let url = publicUrl;
-          if (!url && storagePath) {
-            const { data: signed } = await supabase.storage.from('project-documents').createSignedUrl(storagePath, 3600);
-            url = signed?.signedUrl;
-          }
-          return {
-            id: doc.id || doc.document_name || Math.random().toString(),
-            name: doc.document_name || doc.name || 'Untitled',
-            category: doc.category || 'other',
-            file_type: doc.mime_type || doc.file_type || 'unknown',
-            file_size: doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : '0 KB',
-            uploaded_date: doc.created_at || new Date().toISOString(),
-            quality_score: 80 + Math.floor(Math.random() * 20),
-            gps_available: Math.random() > 0.3,
-            metadata_available: Math.random() > 0.4,
-            ai_summary: {
-              confidence_score: 75 + Math.floor(Math.random() * 25),
-              missing_documents: [],
-              quality_issues: [],
-              duplicate_detected: false,
-              gps_metadata: Math.random() > 0.3,
-              image_metadata: Math.random() > 0.4,
-              overall_assessment: 'Document meets submission requirements',
-            },
-            url,
-            storage_path: storagePath,
-          };
-        })),
+        documents: snapshotDocs,
         ground_images: [],
         drone_images: [],
         supporting_files: [],
-        evidence_items: await Promise.all(galleryItems.map(async (item: any) => {
-          const storagePath = item.storage_path as string | undefined;
-          const publicUrl = item.public_url as string | undefined;
-          let url = publicUrl;
-          if (!url && storagePath) {
-            const { data: signed } = await supabase.storage.from('project-gallery').createSignedUrl(storagePath, 3600);
-            url = signed?.signedUrl;
-          }
-          return {
-            id: item.id || Math.random().toString(),
-            title: item.caption || item.file_name || 'Evidence',
-            description: item.caption || '',
-            type: item.media_type || 'image',
-            location: project.location_name || '',
-            date_collected: item.created_at || new Date().toISOString(),
-            url,
-            storage_path: storagePath,
-            file_type: item.mime_type || '',
-            file_name: item.file_name || '',
-          };
-        })),
+        evidence_items: snapshotEvidence,
         captured_at: new Date().toISOString(),
       };
 
@@ -1448,8 +1716,20 @@ export default function VerificationSubmitPage() {
         snapshot,
       });
 
-      setActiveRequest(result);
-      setSubmitted(true);
+      // Refresh data
+      const [newApps, newPApps] = await Promise.all([
+        getApplicationsForProject(projectId),
+        getCarbonPassportApplicationsForProject(projectId),
+      ]);
+      setApplications(newApps);
+      setPassportApps(newPApps);
+      setShowWizard(false);
+      setResubmitMode(false);
+      setResubmitSnapshot(null);
+      setStep(1);
+      setSelectedAgencies([]);
+      setAdditionalDocs([]);
+      setConfirmed(false);
       toast.success(`Verification requests sent to ${selectedAgencies.length} agencies`);
     } catch (err) {
       console.error('Failed to submit verification request:', err);
@@ -1459,254 +1739,332 @@ export default function VerificationSubmitPage() {
     }
   }
 
-  async function handleApplyPassport(agencyId: string, agencyName: string) {
-    if (!activeRequest || !project || !profile) return;
+  function handleOpenPassportDialog(agencyRequestId: string, agencyName: string, requestId: string) {
+    setPassportTarget({ agencyRequestId, agencyName, requestId });
+    setPassportDialogOpen(true);
+  }
 
-    const agency = activeRequest.selectedAgencies.find(a => a.agencyId === agencyId);
-    if (!agency) return;
-
+  async function handleApplyPassport() {
+    if (!passportTarget || !project || !profile) return;
+    setApplyingPassport(true);
     try {
       const result = await applyForCarbonPassport({
-        requestId: activeRequest.id,
+        requestId: passportTarget.requestId,
         projectId: project.id,
         projectName: project.name,
         projectOwnerId: project.owner_id,
         projectOwnerName: profile.full_name || '',
-        agencyId,
-        agencyName,
-        assignedVerifier: agency.assignedVerifier,
+        agencyId: passportTarget.agencyRequestId,
+        agencyName: passportTarget.agencyName,
+        assignedVerifier: null,
         verificationReportRef: null,
         auditReportRef: null,
       });
 
       setPassportApps(prev => [result, ...prev]);
-      setActiveRequest(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          selectedAgencies: prev.selectedAgencies.map(a => {
-            if (a.agencyId !== agencyId) return a;
-            return { ...a, carbonPassportStatus: 'requested' as CarbonPassportStatus };
-          }),
-        };
-      });
-      toast.success(`Carbon Passport application sent to ${agencyName}`);
+      setPassportStatusMap(prev => ({
+        ...prev,
+        [passportTarget.agencyRequestId]: 'requested',
+      }));
+      setPassportDialogOpen(false);
+      setPassportTarget(null);
+      toast.success(`Carbon Passport application sent to ${passportTarget.agencyName}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to apply for Carbon Passport');
+      toast.error(err instanceof Error ? err.message : 'Failed to apply');
     }
+    setApplyingPassport(false);
   }
+
+  // ── Loading State ─────────────────────────────────────────────
 
   if (loading || projectLoading) {
     return <LoadingSkeleton />;
   }
 
-  if (project?.verification_status === 'rejected') {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <X className="h-6 w-6 text-red-600" />
-            Verification Rejected
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This project&apos;s verification application was rejected. Please review the feedback and consider resubmitting.
-          </p>
-        </div>
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-100">
-              <AlertTriangle className="h-6 w-6 text-red-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-red-900">Application Rejected</h2>
-              <p className="text-sm text-red-700 mt-1">
-                The verification agency has rejected this project&apos;s verification application. You may submit a new application after addressing the issues raised.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const passportAppsMap: Record<string, CarbonPassportStatus> = {};
-  const passportAppIdsMap: Record<string, string> = {};
-  passportApps.forEach(app => {
-    passportAppsMap[app.agencyId] = app.status;
-    passportAppIdsMap[app.agencyId] = app.id;
-  });
-
-  function handleViewPassport() {
-    router.push(`/dashboard/projects/${projectId}/official-records`);
-  }
-
-  if (submitted && activeRequest) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Request</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track your agency verification requests in real-time.
-          </p>
-        </div>
-        <RequestTracker
-          request={activeRequest}
-          projectId={projectId}
-          onApplyPassport={handleApplyPassport}
-          passportApps={passportAppsMap}
-          passportAppIds={passportAppIdsMap}
-          onViewPassport={handleViewPassport}
-        />
-      </div>
-    );
-  }
-
-  if (activeRequest) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Request</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track your agency verification requests in real-time.
-          </p>
-        </div>
-        <RequestTracker
-          request={activeRequest}
-          projectId={projectId}
-          onApplyPassport={handleApplyPassport}
-          passportApps={passportAppsMap}
-          passportAppIds={passportAppIdsMap}
-          onViewPassport={handleViewPassport}
-        />
-      </div>
-    );
-  }
-
-  if (activeApplication) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Submit Verification Application</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create a snapshot of your project for certification review.
-          </p>
-        </div>
-        <ActiveApplicationCard application={activeApplication} projectId={projectId} />
-      </div>
-    );
-  }
+  // ── Main Render ───────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Submit Verification Application</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Verification Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create a snapshot of your project for certification review.
+          Track verification cycles, review agency decisions, and manage certification for this project.
         </p>
       </div>
 
-      {project?.verification_status === 'approved' && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+      {/* Project Status Banner */}
+      <ProjectStatusBanner
+        project={project}
+        applications={applications}
+        passportApps={passportApps}
+      />
+
+      {/* Wizard View */}
+      {showWizard && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowWizard(false);
+                setResubmitMode(false);
+                setResubmitSnapshot(null);
+                setStep(1);
+                setSelectedAgencies([]);
+                setAdditionalDocs([]);
+                setConfirmed(false);
+              }}
+              className="gap-1.5"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to History
+            </Button>
+            {resubmitMode && (
+              <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                <RefreshCw className="h-3 w-3 mr-1" /> Resubmission
+              </Badge>
+            )}
+          </div>
+
           <div>
-            <p className="text-sm font-semibold text-emerald-800">New Verification Request</p>
-            <p className="text-xs text-emerald-600">
-              This project is already verified. Submitting a new request will create an independent verification record without affecting previous verifications.
+            <h2 className="font-display text-lg font-semibold">
+              {resubmitMode ? 'Resubmit Verification Application' : 'Request New Verification'}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {resubmitMode
+                ? 'Review the previous snapshot and update as needed before resubmitting.'
+                : 'Create a snapshot of your project for certification review.'}
             </p>
+          </div>
+
+          <StepIndicator currentStep={step} steps={STEPS} />
+
+          <Card className="rounded-xl border-slate-200 dark:border-slate-800">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  {React.createElement(STEPS[step - 1].icon, { className: 'h-4.5 w-4.5' })}
+                </div>
+                <div>
+                  <CardTitle className="text-base font-display">{STEPS[step - 1].label}</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Step {step} of {STEPS.length}
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {step === 1 && (
+                <Step1ProjectSummary
+                  project={project}
+                  readOnly={resubmitMode}
+                  snapshot={resubmitSnapshot}
+                />
+              )}
+              {step === 2 && (
+                <Step2AgencySelection
+                  selectedAgencies={selectedAgencies}
+                  onChange={setSelectedAgencies}
+                  initialAgencyIds={resubmitMode ? (resubmitOriginalAgencyId ? [resubmitOriginalAgencyId] : []) : undefined}
+                />
+              )}
+              {step === 3 && (
+                <Step2Documents
+                  projectDocuments={projectDocuments}
+                  additionalDocs={additionalDocs}
+                  onAddDoc={handleAddDoc}
+                  onRemoveDoc={handleRemoveDoc}
+                  onUploadFile={handleUploadDocFile}
+                  uploading={uploadingDoc}
+                  resubmitMode={resubmitMode}
+                  resubmitSnapshotDocs={resubmitSnapshot?.documents}
+                  decisionNotes={resubmitDecisionNotes}
+                  keptDocIds={keptDocIds}
+                  onToggleKeepDoc={handleToggleKeepDoc}
+                />
+              )}
+              {step === 4 && (
+                <Step3Evidence
+                  galleryItems={galleryItems}
+                  onUploadEvidence={handleUploadEvidence}
+                  uploading={uploadingEvidence}
+                  resubmitMode={resubmitMode}
+                  resubmitSnapshotEvidence={resubmitSnapshot?.evidence_items}
+                  decisionNotes={resubmitDecisionNotes}
+                  keptEvidenceIds={keptEvidenceIds}
+                  onToggleKeepEvidence={handleToggleKeepEvidence}
+                />
+              )}
+              {step === 5 && (
+                <Step4Declaration confirmed={confirmed} onConfirmChange={setConfirmed} />
+              )}
+              {step === 6 && (
+                <Step5Review
+                  project={project}
+                  projectDocuments={projectDocuments}
+                  additionalDocs={additionalDocs}
+                  galleryItems={galleryItems}
+                  selectedAgencies={selectedAgencies}
+                  resubmitMode={resubmitMode}
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              disabled={step === 1}
+              onClick={() => setStep(s => s - 1)}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" /> Previous
+            </Button>
+            <div className="flex items-center gap-3">
+              {step < 6 ? (
+                <Button
+                  onClick={() => setStep(s => s + 1)}
+                  disabled={step === 2 && selectedAgencies.length === 0}
+                  className="gap-2"
+                >
+                  Next <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="gap-2 h-11 px-6"
+                >
+                  {submitting ? (
+                    <><Clock className="h-4 w-4 animate-spin" /> Submitting...</>
+                  ) : (
+                    <><Send className="h-4 w-4" /> Submit Verification Application</>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      <StepIndicator currentStep={step} steps={STEPS} />
-
-      <Card className="rounded-xl border-slate-200 dark:border-slate-800">
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              {React.createElement(STEPS[step - 1].icon, { className: 'h-4.5 w-4.5' })}
+      {/* Verification History View */}
+      {!showWizard && (
+        <div className="space-y-5">
+          {/* Filter / Search / Sort Bar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-slate-500" />
+              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as StatusFilter)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_FILTER_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <CardTitle className="text-base font-display">{STEPS[step - 1].label}</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Step {step} of {STEPS.length}
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by agency, request number, or verifier..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortOldest(!sortOldest)}
+              className="gap-1.5 shrink-0"
+            >
+              {sortOldest ? <ArrowRight className="h-3.5 w-3.5" /> : <ArrowLeft className="h-3.5 w-3.5" />}
+              {sortOldest ? 'Oldest First' : 'Latest First'}
+            </Button>
+          </div>
+
+          {/* Grouped Verification Cards */}
+          {groupedApplications.length === 0 ? (
+            <EmptyState onRequestVerification={handleRequestVerification} />
+          ) : (
+            <div className="space-y-6">
+              {groupedApplications.map(group => (
+                <div key={group.label} className="space-y-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {group.label} ({group.items.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {group.items.map(card => (
+                      <VerificationHistoryCard
+                        key={card.application.id}
+                        card={card}
+                        isExpanded={expandedCardId === card.application.id}
+                        onToggleExpand={() => setExpandedCardId(prev => prev === card.application.id ? null : card.application.id)}
+                        onResubmit={handleResubmit}
+                        onApplyPassport={handleOpenPassportDialog}
+                        onViewPassport={() => router.push(`/dashboard/projects/${projectId}/official-records`)}
+                        onViewDetails={(id) => router.push(`/dashboard/verification/${id}`)}
+                        hasAnyActivePassport={hasAnyActivePassport}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Request New Verification Button */}
+          <div className="flex justify-center pt-4">
+            <Button
+              size="lg"
+              onClick={handleRequestVerification}
+              className="gap-2 h-12 px-8"
+            >
+              <Plus className="h-5 w-5" /> Request New Verification
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Passport Application Dialog */}
+      <Dialog open={passportDialogOpen} onOpenChange={setPassportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply for Carbon Passport?</DialogTitle>
+            <DialogDescription>
+              This will send a Carbon Passport application to {passportTarget?.agencyName}. The agency will review and process your request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="rounded-lg bg-purple-50 border border-purple-200 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Key className="h-4 w-4 text-purple-600" />
+                <p className="text-sm font-semibold text-purple-800">Carbon Passport Application</p>
+              </div>
+              <p className="text-xs text-purple-700">
+                A Carbon Passport is a digital certificate of your verified carbon credits. It will be issued after agency approval.
               </p>
             </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setPassportDialogOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleApplyPassport}
+                disabled={applyingPassport}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {applyingPassport ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+                ) : (
+                  <><Key className="mr-2 h-4 w-4" /> Submit Request</>
+                )}
+              </Button>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {step === 1 && <Step1ProjectSummary project={project} />}
-          {step === 2 && (
-            <Step2AgencySelection
-              selectedAgencies={selectedAgencies}
-              onChange={setSelectedAgencies}
-            />
-          )}
-          {step === 3 && (
-            <Step2Documents
-              projectDocuments={projectDocuments}
-              additionalDocs={additionalDocs}
-              onAddDoc={handleAddDoc}
-              onRemoveDoc={handleRemoveDoc}
-              onUploadFile={handleUploadDocFile}
-              uploading={uploadingDoc}
-            />
-          )}
-          {step === 4 && <Step3Evidence galleryItems={galleryItems} onUploadEvidence={handleUploadEvidence} uploading={uploadingEvidence} />}
-          {step === 5 && <Step4Declaration confirmed={confirmed} onConfirmChange={setConfirmed} />}
-          {step === 6 && (
-            <Step5Review
-              project={project}
-              projectDocuments={projectDocuments}
-              additionalDocs={additionalDocs}
-              galleryItems={galleryItems}
-              selectedAgencies={selectedAgencies}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          disabled={step === 1}
-          onClick={() => setStep((s) => s - 1)}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Previous
-        </Button>
-
-        <div className="flex items-center gap-3">
-          {step < 5 ? (
-            <Button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={(step === 2 && selectedAgencies.length === 0) || (step === 5 && !confirmed)}
-              className="gap-2"
-            >
-              Next
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="gap-2 h-11 px-6"
-            >
-              {submitting ? (
-                <>
-                  <Clock className="h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4" />
-                  Submit Verification Application
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

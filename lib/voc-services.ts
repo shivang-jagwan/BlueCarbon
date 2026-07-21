@@ -28,6 +28,13 @@ import type {
   AgencyCertification,
   AgencyAvailability,
   AgencyRecentProject,
+  AuditMediaItem,
+  GalleryAlbum,
+  AuditLocationCapture,
+  AuditMediaType,
+  GalleryAlbumType,
+  VerificationCertificate,
+  CarbonPassport,
 } from './voc-types';
 
 // ── Workflow State Machine ──────────────────────────────────
@@ -726,6 +733,34 @@ export async function completeAgencyAudit(requestId: string, agencyId: string): 
       actorRole: 'Verifier',
       metadata: { agency_id: agencyId },
     });
+
+    // Auto-create audit album on completion
+    try {
+      const { data: agency } = await supabase
+        .from('verification_agencies')
+        .select('name')
+        .eq('id', agencyId)
+        .single();
+
+      const { data: auditReport } = await supabase
+        .from('voc_audit_reports')
+        .select('auditor_name, audit_date')
+        .eq('voc_agency_request_id', requestId)
+        .single();
+
+      if (agency) {
+        await createAuditAlbumOnCompletion({
+          projectId: req.project_id,
+          verificationId: requestId,
+          auditId: requestId,
+          agencyName: agency.name,
+          auditorName: auditReport?.auditor_name || 'Unknown Auditor',
+          auditDate: auditReport?.audit_date || new Date().toISOString(),
+        });
+      }
+    } catch {
+      // Non-critical: don't fail audit completion if album creation fails
+    }
   }
 }
 
@@ -832,6 +867,18 @@ export async function applyForCarbonPassport(params: {
   verificationReportRef: string | null;
   auditReportRef: string | null;
 }): Promise<CarbonPassportApplication> {
+  // Guard: block if project already has an active (requested/under_processing) passport
+  const { data: existingActive } = await supabase
+    .from('voc_passport_applications')
+    .select('id, status')
+    .eq('project_id', params.projectId)
+    .in('status', ['requested', 'under_processing'])
+    .limit(1);
+
+  if (existingActive && existingActive.length > 0) {
+    throw new Error('A Carbon Passport application is already active for this project. Please wait for the current one to be processed.');
+  }
+
   const { data: app } = await supabase
     .from('voc_passport_applications')
     .insert({
@@ -910,6 +957,7 @@ export async function updateCarbonPassportStatus(
       requested: 'Passport Requested',
       under_processing: 'Under Processing',
       issued: 'Passport Issued',
+      rejected: 'Rejected',
     };
 
     await sendNotification({
@@ -964,17 +1012,27 @@ export async function updateCarbonPassportStatus(
         },
       });
 
-      await supabase.from('voc_official_records').insert([
-        {
-          request_id: app.request_id,
-          record_type: 'carbon_passport',
-          title: 'Carbon Passport',
-          description: `Carbon Passport ${passportNum} issued by ${app.agency_name}`,
-          verifier_name: app.agency_name,
-          ngo_name: app.agency_name,
-          file_name: `carbon-passport-${passportNum}.pdf`,
-        },
-        {
+      const { data: passportRecord } = await supabase.from('voc_official_records').insert({
+        request_id: app.request_id,
+        record_type: 'carbon_passport',
+        title: 'Carbon Passport',
+        description: `Carbon Passport ${passportNum} issued by ${app.agency_name}`,
+        verifier_name: app.agency_name,
+        ngo_name: app.agency_name,
+        file_name: `carbon-passport-${passportNum}.pdf`,
+      }).select('id').single();
+
+      // Check if certificate already linked
+      const { data: existingAgencyReq } = await supabase
+        .from('voc_agency_requests')
+        .select('certificate_id')
+        .eq('request_id', app.request_id)
+        .eq('agency_id', app.agency_id)
+        .single();
+
+      let certId = existingAgencyReq?.certificate_id ?? null;
+      if (!certId) {
+        const { data: certRecord } = await supabase.from('voc_official_records').insert({
           request_id: app.request_id,
           record_type: 'verification_certificate',
           title: 'Verification Certificate',
@@ -982,8 +1040,19 @@ export async function updateCarbonPassportStatus(
           verifier_name: app.agency_name,
           ngo_name: app.agency_name,
           file_name: `verification-certificate-${applicationId}.pdf`,
-        },
-      ]);
+        }).select('id').single();
+        certId = certRecord?.id ?? null;
+      }
+
+      // Link passport (+ certificate if new) to the verification record
+      await supabase
+        .from('voc_agency_requests')
+        .update({
+          carbon_passport_id: passportRecord?.id ?? null,
+          ...(certId && !existingAgencyReq?.certificate_id ? { certificate_id: certId } : {}),
+        })
+        .eq('request_id', app.request_id)
+        .eq('agency_id', app.agency_id);
     }
   }
 }
@@ -1458,6 +1527,69 @@ export async function getApplication(id: string): Promise<VerificationApplicatio
   else if (mappedStatus === 'returned_for_revision') { decision = 'return_for_revision'; decisionDate = data.last_updated as string; }
   else if (mappedStatus === 'rejected') { decision = 'reject'; decisionDate = data.last_updated as string; }
 
+  // Fetch linked official records
+  const linkedRecordIds = [data.certificate_id, data.audit_report_id, data.carbon_passport_id].filter(Boolean) as string[];
+  let certRecord: Record<string, unknown> | null = null;
+  let auditRecord: Record<string, unknown> | null = null;
+  let passportRecord: Record<string, unknown> | null = null;
+
+  if (linkedRecordIds.length > 0) {
+    const { data: records } = await supabase
+      .from('voc_official_records')
+      .select('*')
+      .in('id', linkedRecordIds);
+
+    if (records) {
+      for (const r of records) {
+        if (r.id === data.certificate_id) certRecord = r as Record<string, unknown>;
+        if (r.id === data.audit_report_id) auditRecord = r as Record<string, unknown>;
+        if (r.id === data.carbon_passport_id) passportRecord = r as Record<string, unknown>;
+      }
+    }
+  }
+
+  // Build verification certificate from linked record
+  let verificationCertificate: VerificationCertificate | null = null;
+  if (certRecord) {
+    verificationCertificate = {
+      id: certRecord.id as string,
+      certificate_number: (certRecord.file_name as string)?.replace('.pdf', '') || `CERT-${id.slice(0, 8).toUpperCase()}`,
+      application_id: id,
+      project_name: (req?.project_name as string) || '',
+      project_owner: (req?.project_owner_name as string) || '',
+      ngo: data.agency_name || '',
+      verifier: (certRecord.verifier_name as string) || decisionVerifierName || '',
+      decision: 'approve' as VerificationDecision,
+      issued_date: (certRecord.created_at as string) || '',
+      verified_documents: [],
+      reviewer_notes: decisionNotes,
+      digital_signature: digitalSig || '',
+      blockchain_hash: bcHash || '',
+    };
+  }
+
+  // Build carbon passport from linked record
+  let carbonPassport: CarbonPassport | null = null;
+  if (passportRecord) {
+    const ppNum = (passportRecord.file_name as string)?.replace('carbon-passport-', '').replace('.pdf', '') || `CP-${id.slice(0, 8).toUpperCase()}`;
+    carbonPassport = {
+      id: passportRecord.id as string,
+      passport_number: ppNum,
+      application_id: id,
+      project_name: (req?.project_name as string) || '',
+      project_owner: (req?.project_owner_name as string) || '',
+      ngo: data.agency_name || '',
+      carbon_credits_tonnes: 0,
+      methodology: '',
+      valid_from: '',
+      valid_until: '',
+      issued_date: (passportRecord.created_at as string) || '',
+      issued_by: data.agency_name || '',
+      digital_signature: '',
+      blockchain_hash: '',
+    };
+  }
+
   return {
     id: data.id,
     application_number: data.request_id,
@@ -1486,8 +1618,8 @@ export async function getApplication(id: string): Promise<VerificationApplicatio
     decision_verifier_name: decisionVerifierName,
     digital_signature: digitalSig,
     blockchain_hash: bcHash,
-    carbon_passport: null,
-    verification_certificate: null,
+    carbon_passport: carbonPassport,
+    verification_certificate: verificationCertificate,
   };
 }
 
@@ -2052,7 +2184,7 @@ export async function submitDecisionWithMetadata(params: {
   // Notify project owner
   const { data: req } = await supabase
     .from('voc_requests')
-    .select('project_owner_id, project_name')
+    .select('project_owner_id, project_owner_name, project_name')
     .eq('id', params.requestId)
     .single();
 
@@ -2108,7 +2240,11 @@ export async function submitDecisionWithMetadata(params: {
     }
 
     if (Object.keys(projectUpdates).length > 0) {
-      await supabase.from('projects').update(projectUpdates).eq('id', params.projectId);
+      await fetch('/api/admin/project-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: params.projectId, updates: projectUpdates }),
+      });
     }
   }
 
@@ -2119,10 +2255,10 @@ export async function submitDecisionWithMetadata(params: {
     .update({ verification_status: requestStatusMap[params.decision] })
     .eq('id', params.requestId);
 
-  // On approve: create official records
+  // On approve: create official records and link to verification record
   if (params.decision === 'approved') {
     // Create verification certificate official record
-    await supabase.from('voc_official_records').insert({
+    const { data: certRecord } = await supabase.from('voc_official_records').insert({
       request_id: params.requestId,
       record_type: 'verification_certificate',
       title: 'Verification Certificate',
@@ -2130,11 +2266,12 @@ export async function submitDecisionWithMetadata(params: {
       verifier_name: params.decisionVerifierName,
       ngo_name: params.agencyName || '',
       file_name: `verification-certificate-${params.requestId}.pdf`,
-    });
+    }).select('id').single();
 
     // Create audit report official record if audit exists
+    let auditRecordId: string | null = null;
     if (params.auditReport) {
-      await supabase.from('voc_official_records').insert({
+      const { data: auditRecord } = await supabase.from('voc_official_records').insert({
         request_id: params.requestId,
         record_type: 'audit_report',
         title: 'Audit Report',
@@ -2142,9 +2279,410 @@ export async function submitDecisionWithMetadata(params: {
         verifier_name: params.auditReport.auditor_name,
         ngo_name: '',
         file_name: `audit-report-${params.requestId}.pdf`,
+      }).select('id').single();
+      auditRecordId = auditRecord?.id ?? null;
+    }
+
+    // Link official records to the verification record
+    await supabase
+      .from('voc_agency_requests')
+      .update({
+        certificate_id: certRecord?.id ?? null,
+        audit_report_id: auditRecordId,
+      })
+      .eq('request_id', params.requestId)
+      .eq('agency_id', params.agencyId);
+
+    // Auto-grant carbon passport
+    try {
+      const passportApp = await applyForCarbonPassport({
+        requestId: params.requestId,
+        projectId: params.projectId,
+        projectName: params.projectName,
+        projectOwnerId: req?.project_owner_id || '',
+        projectOwnerName: req?.project_owner_name || '',
+        agencyId: params.agencyId,
+        agencyName: params.agencyName || 'Verification Agency',
+        assignedVerifier: params.decisionVerifierName,
+        verificationReportRef: certRecord?.id ?? null,
+        auditReportRef: auditRecordId,
       });
+
+      await updateCarbonPassportStatus(passportApp.id, 'issued', {
+        passportNumber: `CP-${params.projectId.substring(0, 8).toUpperCase()}`,
+      });
+
+      await fetch('/api/admin/project-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: params.projectId, updates: { passport_issued_at: new Date().toISOString() } }),
+      });
+    } catch (err) {
+      console.error('[VOC] Auto-grant carbon passport failed:', err);
     }
   }
 
   function label(d: string) { return d === 'approved' ? 'Approved' : d === 'returned' ? 'Returned for Revision' : 'Rejected'; }
+}
+
+// ============================================================
+// GEOSPATIAL EVIDENCE COLLECTION — Services
+// ============================================================
+
+// ── Audit Media ─────────────────────────────────────────────
+
+export async function uploadAuditMedia(params: {
+  projectId: string;
+  verificationId?: string;
+  auditId?: string;
+  albumId?: string;
+  mediaType: AuditMediaType;
+  file: File;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  altitudeMeters?: number;
+  deviceName?: string;
+  verifierName?: string;
+  capturedAt?: string;
+  flightDate?: string;
+  satelliteDate?: string;
+  description?: string;
+  fieldNotes?: string;
+}): Promise<AuditMediaItem> {
+  const timestamp = Date.now();
+  const ext = params.file.name.split('.').pop() || 'bin';
+  const folder = params.mediaType === 'photo' ? 'photos'
+    : params.mediaType === 'drone_image' ? 'drone'
+    : params.mediaType === 'drone_video' ? 'videos'
+    : 'satellite';
+  const storagePath = `${params.projectId}/${params.verificationId || 'general'}/${params.auditId || 'draft'}/${folder}/${timestamp}_${params.file.name}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('audit-evidence')
+    .upload(storagePath, params.file, { contentType: params.file.type, upsert: false });
+
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const { data: row, error: dbError } = await supabase
+    .from('audit_media')
+    .insert({
+      project_id: params.projectId,
+      verification_id: params.verificationId ?? null,
+      audit_id: params.auditId ?? null,
+      album_id: params.albumId ?? null,
+      media_type: params.mediaType,
+      storage_path: storagePath,
+      file_name: params.file.name,
+      file_size: params.file.size,
+      mime_type: params.file.type,
+      latitude: params.latitude ?? null,
+      longitude: params.longitude ?? null,
+      accuracy_meters: params.accuracyMeters ?? null,
+      altitude_meters: params.altitudeMeters ?? null,
+      device_name: params.deviceName ?? null,
+      uploaded_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+      verifier_name: params.verifierName ?? null,
+      captured_at: params.capturedAt ?? new Date().toISOString(),
+      flight_date: params.flightDate ?? null,
+      satellite_date: params.satelliteDate ?? null,
+      description: params.description ?? null,
+      field_notes: params.fieldNotes ?? null,
+    })
+    .select()
+    .single();
+
+  if (dbError) throw new Error(`Database insert failed: ${dbError.message}`);
+
+  return mapAuditMediaFromDb(row);
+}
+
+export async function getAuditMediaForAudit(auditId: string): Promise<AuditMediaItem[]> {
+  const { data } = await supabase
+    .from('audit_media')
+    .select('*')
+    .eq('audit_id', auditId)
+    .order('uploaded_at', { ascending: true });
+
+  if (!data) return [];
+  return data.map(mapAuditMediaFromDb);
+}
+
+export async function getAuditMediaForProject(projectId: string): Promise<AuditMediaItem[]> {
+  const { data } = await supabase
+    .from('audit_media')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('uploaded_at', { ascending: false });
+
+  if (!data) return [];
+  return data.map(mapAuditMediaFromDb);
+}
+
+export async function deleteAuditMedia(mediaId: string): Promise<void> {
+  const { data: media } = await supabase
+    .from('audit_media')
+    .select('storage_path')
+    .eq('id', mediaId)
+    .single();
+
+  if (media?.storage_path) {
+    await supabase.storage.from('audit-evidence').remove([media.storage_path]);
+  }
+
+  const { error } = await supabase.from('audit_media').delete().eq('id', mediaId);
+  if (error) throw new Error(`Delete failed: ${error.message}`);
+}
+
+// ── Location Captures ───────────────────────────────────────
+
+export async function captureAuditLocation(params: {
+  auditId?: string;
+  projectId: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+  altitudeMeters?: number;
+  verifierName?: string;
+  description?: string;
+}): Promise<AuditLocationCapture> {
+  const { data, error } = await supabase
+    .from('audit_location_captures')
+    .insert({
+      audit_id: params.auditId ?? null,
+      project_id: params.projectId,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      accuracy_meters: params.accuracyMeters ?? null,
+      altitude_meters: params.altitudeMeters ?? null,
+      captured_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+      verifier_name: params.verifierName ?? null,
+      description: params.description ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Location capture failed: ${error.message}`);
+  return mapLocationCaptureFromDb(data);
+}
+
+export async function getAuditLocationsForAudit(auditId: string): Promise<AuditLocationCapture[]> {
+  const { data } = await supabase
+    .from('audit_location_captures')
+    .select('*')
+    .eq('audit_id', auditId)
+    .order('captured_at', { ascending: true });
+
+  if (!data) return [];
+  return data.map(mapLocationCaptureFromDb);
+}
+
+// ── Gallery Albums ──────────────────────────────────────────
+
+export async function createAuditAlbum(params: {
+  projectId: string;
+  verificationId?: string;
+  auditId?: string;
+  title: string;
+  description?: string;
+  agencyName?: string;
+  verifierName?: string;
+  auditDate?: string;
+}): Promise<GalleryAlbum> {
+  const { data, error } = await supabase
+    .from('gallery_albums')
+    .insert({
+      project_id: params.projectId,
+      verification_id: params.verificationId ?? null,
+      audit_id: params.auditId ?? null,
+      album_type: 'audit',
+      title: params.title,
+      description: params.description ?? null,
+      agency_name: params.agencyName ?? null,
+      verifier_name: params.verifierName ?? null,
+      audit_date: params.auditDate ?? null,
+      created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Album creation failed: ${error.message}`);
+  return mapAlbumFromDb(data);
+}
+
+export async function createMonitoringAlbum(params: {
+  projectId: string;
+  title: string;
+  description?: string;
+}): Promise<GalleryAlbum> {
+  const { data, error } = await supabase
+    .from('gallery_albums')
+    .insert({
+      project_id: params.projectId,
+      album_type: 'monitoring',
+      title: params.title,
+      description: params.description ?? null,
+      created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Album creation failed: ${error.message}`);
+  return mapAlbumFromDb(data);
+}
+
+export async function getAlbumsForProject(projectId: string): Promise<GalleryAlbum[]> {
+  const { data } = await supabase
+    .from('gallery_albums')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+
+  if (!data) return [];
+  return data.map(mapAlbumFromDb);
+}
+
+export async function getAlbumWithMedia(albumId: string): Promise<GalleryAlbum | null> {
+  const { data: album } = await supabase
+    .from('gallery_albums')
+    .select('*')
+    .eq('id', albumId)
+    .single();
+
+  if (!album) return null;
+
+  const { data: media } = await supabase
+    .from('audit_media')
+    .select('*')
+    .eq('album_id', albumId)
+    .order('uploaded_at', { ascending: true });
+
+  const mapped = mapAlbumFromDb(album);
+  const mediaItems = (media || []).map(mapAuditMediaFromDb);
+  mapped.items = mediaItems;
+  mapped.media_count = mediaItems.length;
+  return mapped;
+}
+
+export async function deleteAlbum(albumId: string): Promise<void> {
+  await supabase.from('audit_media').delete().eq('album_id', albumId);
+  const { error } = await supabase.from('gallery_albums').delete().eq('id', albumId);
+  if (error) throw new Error(`Delete album failed: ${error.message}`);
+}
+
+// ── Auto-Album Creation on Audit Completion ─────────────────
+
+export async function createAuditAlbumOnCompletion(params: {
+  projectId: string;
+  verificationId: string;
+  auditId: string;
+  agencyName: string;
+  auditorName: string;
+  auditDate: string;
+}): Promise<GalleryAlbum | null> {
+  const album = await createAuditAlbum({
+    projectId: params.projectId,
+    verificationId: params.verificationId,
+    auditId: params.auditId,
+    title: `Audit - ${new Date(params.auditDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+    description: `Verified by ${params.agencyName}`,
+    agencyName: params.agencyName,
+    verifierName: params.auditorName,
+    auditDate: params.auditDate,
+  });
+
+  await supabase
+    .from('audit_media')
+    .update({ album_id: album.id })
+    .eq('audit_id', params.auditId)
+    .is('album_id', null);
+
+  return album;
+}
+
+// ── Signed URL Helper ───────────────────────────────────────
+
+export async function getAuditMediaSignedUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('audit-evidence')
+    .createSignedUrl(storagePath, 3600);
+  if (error) throw new Error(`Signed URL failed: ${error.message}`);
+  return data.signedUrl;
+}
+
+export async function getAuditMediaSignedUrls(items: AuditMediaItem[]): Promise<AuditMediaItem[]> {
+  return Promise.all(
+    items.map(async (item) => {
+      try {
+        const url = await getAuditMediaSignedUrl(item.storage_path);
+        return { ...item, url };
+      } catch {
+        return item;
+      }
+    })
+  );
+}
+
+// ── Mappers ─────────────────────────────────────────────────
+
+function mapAuditMediaFromDb(row: Record<string, unknown>): AuditMediaItem {
+  return {
+    id: String(row.id),
+    project_id: String(row.project_id),
+    verification_id: row.verification_id as string | null,
+    audit_id: row.audit_id as string | null,
+    album_id: row.album_id as string | null,
+    media_type: row.media_type as AuditMediaType,
+    storage_path: String(row.storage_path),
+    file_name: row.file_name as string | null,
+    file_size: row.file_size as number | null,
+    mime_type: row.mime_type as string | null,
+    latitude: row.latitude as number | null,
+    longitude: row.longitude as number | null,
+    accuracy_meters: row.accuracy_meters as number | null,
+    altitude_meters: row.altitude_meters as number | null,
+    device_name: row.device_name as string | null,
+    uploaded_by: row.uploaded_by as string | null,
+    verifier_name: row.verifier_name as string | null,
+    uploaded_at: String(row.uploaded_at),
+    captured_at: row.captured_at as string | null,
+    flight_date: row.flight_date as string | null,
+    satellite_date: row.satellite_date as string | null,
+    description: row.description as string | null,
+    field_notes: row.field_notes as string | null,
+    metadata: (row.metadata as Record<string, unknown>) || {},
+  };
+}
+
+function mapAlbumFromDb(row: Record<string, unknown>): GalleryAlbum {
+  return {
+    id: String(row.id),
+    project_id: String(row.project_id),
+    verification_id: row.verification_id as string | null,
+    audit_id: row.audit_id as string | null,
+    album_type: row.album_type as GalleryAlbumType,
+    title: String(row.title),
+    description: row.description as string | null,
+    agency_name: row.agency_name as string | null,
+    verifier_name: row.verifier_name as string | null,
+    audit_date: row.audit_date as string | null,
+    created_by: row.created_by as string | null,
+    created_at: String(row.created_at),
+  };
+}
+
+function mapLocationCaptureFromDb(row: Record<string, unknown>): AuditLocationCapture {
+  return {
+    id: String(row.id),
+    audit_id: row.audit_id as string | null,
+    project_id: String(row.project_id),
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    accuracy_meters: row.accuracy_meters as number | null,
+    altitude_meters: row.altitude_meters as number | null,
+    captured_by: row.captured_by as string | null,
+    verifier_name: row.verifier_name as string | null,
+    captured_at: String(row.captured_at),
+    description: row.description as string | null,
+  };
 }

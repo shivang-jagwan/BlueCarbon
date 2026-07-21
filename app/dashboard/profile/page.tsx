@@ -10,10 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AvatarUpload } from '@/components/shared/avatar-upload';
 import { FileUpload } from '@/components/shared/FileUpload';
 import {
-  User, MapPin, Landmark, Briefcase, ShieldCheck, Save, Loader2, Building2, Leaf,
+  User, MapPin, Landmark, ShieldCheck, Save, Loader2, Building2, Leaf,
 } from 'lucide-react';
 import { getRoleLabel } from '@/lib/navigation';
 import { INDUSTRIES, SUSTAINABILITY_FOCUS_AREAS } from '@/lib/types';
@@ -113,8 +113,6 @@ export default function ProfilePage() {
 
   if (!profile) return null;
 
-  const initials = (profile.full_name || profile.email).split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -126,18 +124,18 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      {/* Profile Header */}
+      {/* Profile Photo + Identity Header */}
       <Card className="p-6">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16 border border-border">
-            <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">{initials}</AvatarFallback>
-          </Avatar>
-          <div>
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          <AvatarUpload size="lg" />
+          <div className="flex-1 text-center sm:text-left">
             <h2 className="font-display text-lg font-semibold">{profile.full_name || 'User'}</h2>
             <p className="text-sm text-muted-foreground">{profile.email}</p>
-            <div className="mt-1.5 flex items-center gap-2">
+            <div className="mt-2 flex items-center justify-center gap-2 sm:justify-start">
               <Badge variant="secondary">{getRoleLabel(profile.role)}</Badge>
-              <Badge variant="secondary" className="gap-1"><ShieldCheck className="h-3 w-3" />KYC: {profile.kyc_status}</Badge>
+              <Badge variant="secondary" className="gap-1">
+                <ShieldCheck className="h-3 w-3" />KYC: {profile.kyc_status}
+              </Badge>
             </div>
           </div>
         </div>

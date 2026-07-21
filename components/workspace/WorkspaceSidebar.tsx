@@ -54,11 +54,12 @@ function SidebarItem({
   basePath: string;
   pathname: string;
 }) {
-  const href = basePath + item.href;
+  const isAbsolute = item.href.startsWith('/dashboard');
+  const href = isAbsolute ? item.href : basePath + item.href;
   const isActive =
     item.href === ''
       ? pathname === basePath
-      : pathname.startsWith(basePath + item.href);
+      : pathname.startsWith(href);
   const Icon = item.icon;
 
   return (

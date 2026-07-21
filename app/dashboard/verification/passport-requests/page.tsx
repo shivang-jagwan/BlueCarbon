@@ -38,6 +38,7 @@ import {
   ShieldCheck,
   FileText,
   Leaf,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -51,6 +52,8 @@ export default function PassportRequestsPage() {
   const [selectedRequest, setSelectedRequest] = React.useState<CarbonPassportApplication | null>(null);
   const [showIssueDialog, setShowIssueDialog] = React.useState(false);
   const [issuing, setIssuing] = React.useState(false);
+  const [rejecting, setRejecting] = React.useState(false);
+  const [rejectionReason, setRejectionReason] = React.useState('');
   const [projectData, setProjectData] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -65,9 +68,10 @@ export default function PassportRequestsPage() {
   }
 
   const filtered = React.useMemo(() => {
-    if (!search) return requests;
+    let results = requests.filter((r) => r.status === 'requested' || r.status === 'under_processing');
+    if (!search) return results;
     const q = search.toLowerCase();
-    return requests.filter(
+    return results.filter(
       (r) =>
         r.projectName.toLowerCase().includes(q) ||
         r.agencyName.toLowerCase().includes(q) ||
@@ -108,6 +112,23 @@ export default function PassportRequestsPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to issue passport');
     }
     setIssuing(false);
+  }
+
+  async function handleRejectPassport() {
+    if (!selectedRequest) return;
+    setRejecting(true);
+    try {
+      await updateCarbonPassportStatus(selectedRequest.id, 'rejected');
+      toast.success('Carbon Passport application rejected');
+      setShowIssueDialog(false);
+      setSelectedRequest(null);
+      setProjectData(null);
+      setRejectionReason('');
+      await loadRequests();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reject passport');
+    }
+    setRejecting(false);
   }
 
   return (
@@ -331,20 +352,35 @@ export default function PassportRequestsPage() {
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => { setShowIssueDialog(false); setSelectedRequest(null); setProjectData(null); }}>
+                <Button variant="outline" onClick={() => { setShowIssueDialog(false); setSelectedRequest(null); setProjectData(null); setRejectionReason(''); }}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleIssuePassport}
-                  disabled={issuing}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {issuing ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Issuing...</>
-                  ) : (
-                    <><Key className="mr-2 h-4 w-4" /> Issue Carbon Passport</>
-                  )}
-                </Button>
+                {selectedRequest.status !== 'issued' && (
+                  <>
+                    <Button
+                      variant="destructive"
+                      onClick={handleRejectPassport}
+                      disabled={rejecting || issuing}
+                    >
+                      {rejecting ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Rejecting...</>
+                      ) : (
+                        <><XCircle className="mr-2 h-4 w-4" /> Reject</>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleIssuePassport}
+                      disabled={issuing || rejecting}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {issuing ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Issuing...</>
+                      ) : (
+                        <><Key className="mr-2 h-4 w-4" /> Issue Carbon Passport</>
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}

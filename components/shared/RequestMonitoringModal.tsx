@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/auth-provider';
 import { supabase } from '@/lib/supabase/client';
+import { sendNotification } from '@/lib/voc-services';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -168,22 +169,21 @@ export function RequestMonitoringModal({
         description: 'Company requested monitoring partnership with ' + verifierName,
       });
 
-      await supabase.from('notifications').insert([
-        {
-          user_id: selectedProject.owner_id,
-          title: 'New Monitoring Partnership Invitation',
-          body: 'A Sustainability Partner wants to fund monitoring for ' + selectedProject.name + '.',
-          type: 'verification',
-          link: '/dashboard/projects/' + projectId + '/monitoring',
-        },
-        {
-          user_id: verifierId,
-          title: 'New Monitoring Partnership Request',
-          body: 'A Sustainability Partner has requested you to monitor ' + selectedProject.name + '.',
-          type: 'verification',
-          link: '/dashboard/monitoring',
-        },
-      ]);
+      await sendNotification({
+        title: 'New Monitoring Partnership Invitation',
+        body: 'A Sustainability Partner wants to fund monitoring for ' + selectedProject.name + '.',
+        type: 'verification',
+        targetUserId: selectedProject.owner_id,
+        link: '/dashboard/projects/' + projectId + '/monitoring',
+      });
+
+      await sendNotification({
+        title: 'New Monitoring Partnership Request',
+        body: 'A Sustainability Partner has requested you to monitor ' + selectedProject.name + '.',
+        type: 'verification',
+        targetUserId: verifierId,
+        link: '/dashboard/monitoring',
+      });
 
       toast.success('Monitoring partnership request sent successfully.');
       onClose();
