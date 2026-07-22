@@ -144,12 +144,41 @@ export function useMonitoringReports(projectId: string | null) {
       return;
     }
     setLoading(true);
-    const { data } = await supabase
-      .from('monitoring_reports')
-      .select('*')
+    const { data, error } = await supabase
+      .from('project_monitoring_reports')
+      .select(`
+        *,
+        verifier:profiles!project_monitoring_reports_verifier_id_fkey(full_name, organization)
+      `)
       .eq('project_id', projectId)
-      .order('period_month', { ascending: false });
-    setReports((data as MonitoringReport[]) || []);
+      .in('status', ['submitted', 'approved', 'reviewed'])
+      .order('report_date', { ascending: false });
+
+    if (error) {
+      console.error("DEBUG: useMonitoringReports error:", error);
+    }
+
+    if (!error && data) {
+      const mapped = data.map((r: any) => ({
+        ...r,
+        id: r.id,
+        project_id: r.project_id,
+        period_month: r.report_date ? r.report_date.substring(0, 7) : '2026-07',
+        area_observed_hectares: r.canopy_coverage || null,
+        ndvi_avg: null,
+        carbon_estimate_tonnes: r.carbon_estimate_tons || null,
+        notes: r.partner_notes || r.recommendations || null,
+        status: r.status,
+        created_by: r.verifier_id,
+        created_at: r.created_at,
+        report_type: 'monthly',
+        organization_name: r.verifier?.organization || r.verifier?.full_name || 'Verifier',
+        submitted_by_name: r.verifier?.full_name || 'Verifier'
+      }));
+      setReports((mapped as any) || []);
+    } else {
+      setReports([]);
+    }
     setLoading(false);
   }, [projectId]);
 
